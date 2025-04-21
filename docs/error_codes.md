@@ -1,76 +1,75 @@
-# Smart Shopper Error Codes & Retry Policies
+# Smart Shopper Error Codes
 
-This document centralizes all error codes, their meanings, and recommended retry strategies for the Smart Shopper MCP tool stack.
+This document contains centralized error codes and retry strategies for the Smart Shopper application.
 
-## Error Code Format
+## MCP Tool Errors
 
-Error codes follow the format: `SS-{SOURCE}-{CODE}` where:
-- `SS` is the Smart Shopper prefix
-- `{SOURCE}` is a 3-letter code for the error source (e.g., API, SRP for SerpAPI)
-- `{CODE}` is a numeric code specific to the error
+| Code | Meaning | Retry Strategy |
+|------|---------|----------------|
+| `MCP_001` | SerpAPI request failed | Retry once with exponential backoff (2s) |
+| `MCP_002` | SerpAPI rate limit exceeded | Wait 5s and retry once |
+| `MCP_003` | SerpAPI invalid API key | Do not retry; check environment variables |
+| `MCP_004` | SerpAPI malformed query | Do not retry; fix query parameters |
+| `MCP_005` | Search1API request failed | Retry once with exponential backoff (2s) |
+| `MCP_006` | Search1API rate limit exceeded | Wait 5s and retry once |
+| `MCP_007` | Search1API invalid API key | Do not retry; check environment variables |
+| `MCP_008` | Search1API malformed query | Do not retry; fix query parameters |
+| `MCP_009` | Perplexity request failed | Retry once with exponential backoff (2s) |
+| `MCP_010` | Perplexity rate limit exceeded | Wait 5s and retry once |
+| `MCP_011` | Perplexity invalid API key | Do not retry; check environment variables |
+| `MCP_012` | Perplexity malformed query | Do not retry; fix query parameters |
+| `MCP_013` | Multi-source search failed | Retry individual sources that failed |
+| `MCP_014` | All sources failed | Fall back to cached results if available |
 
-## Error Categories
+## Canvas Operation Errors
 
-| Category | Range | Severity |
-|----------|-------|----------|
-| 1xx | 100-199 | Configuration errors (no retry) |
-| 2xx | 200-299 | Validation errors (no retry) |
-| 3xx | 300-399 | Rate limiting (retry with backoff) |
-| 4xx | 400-499 | Temporary API service errors (retry) |
-| 5xx | 500-599 | Internal MCP server errors (retry once) |
+| Code | Meaning | Retry Strategy |
+|------|---------|----------------|
+| `CANVAS_001` | Invalid card ID | Do not retry; check card ID |
+| `CANVAS_002` | Duplicate card ID | Do not retry; use a unique ID |
+| `CANVAS_003` | Grid layout invalid | Do not retry; check layout parameters |
+| `CANVAS_004` | Too many cards for grid | Reduce number of cards or increase grid size |
+| `CANVAS_005` | Highlight failed - card not found | Do not retry; check card ID |
+| `CANVAS_006` | Undo operation failed - history empty | Do not retry; check undo parameters |
 
-## Error Codes & Retry Policies
+## General Application Errors
 
-| Error Code | Description | Retry Strategy |
-|------------|-------------|----------------|
-| SS-API-100 | Missing or invalid API key | No retry; escalate to user for key verification |
-| SS-API-101 | Invalid tool parameter | No retry; check schema and fix parameters |
-| SS-SRP-201 | Invalid SerpAPI search query | No retry; reformulate query |
-| SS-SRP-301 | SerpAPI rate limit exceeded | Retry with exponential backoff (initial: 2s, max: 10s) |
-| SS-SRP-401 | SerpAPI temporary service error | Retry up to 3 times with 1s delay |
-| SS-SCH-201 | Invalid Search1 query syntax | No retry; check query format |
-| SS-SCH-301 | Search1 API rate limit exceeded | Retry with exponential backoff (initial: 1s, max: 5s) |
-| SS-SCH-401 | Search1 API temporary error | Retry up to 3 times with 1s delay |
-| SS-PPX-201 | Invalid Perplexity request | No retry; check parameters |
-| SS-PPX-301 | Perplexity API rate limit | Retry with exponential backoff (initial: 2s, max: 8s) |
-| SS-PPX-401 | Perplexity temporary service error | Retry up to 2 times with 2s delay |
-| SS-CNV-101 | Invalid canvas operation | No retry; check operation parameters |
-| SS-CNV-201 | Canvas operation on non-existent item | No retry; check item ID exists |
-| SS-MCP-500 | Internal MCP server error | Retry once after 1s; then notify user if persistent |
-| SS-MCP-501 | MCP server timeout | Retry once with simplified query; then adjust parameters |
+| Code | Meaning | Retry Strategy |
+|------|---------|----------------|
+| `APP_001` | Environment variable missing | Do not retry; check .env file |
+| `APP_002` | Server connection failed | Retry with exponential backoff (max 3 times) |
+| `APP_003` | Client-side rendering error | Reload the application |
+| `APP_004` | WebSocket connection lost | Attempt reconnection with exponential backoff |
+| `APP_005` | Local storage access failed | Fall back to in-memory storage |
 
-## Fallback Strategies
+## Network Errors
 
-When encountering persistent errors:
+| Code | Meaning | Retry Strategy |
+|------|---------|----------------|
+| `NET_001` | Network request timeout | Retry once with increased timeout |
+| `NET_002` | Network connection lost | Retry when connection is restored |
+| `NET_003` | CORS error | Do not retry; check server configuration |
+| `NET_004` | Request payload too large | Do not retry; reduce payload size |
 
-1. **SerpAPI failures**: Fall back to Search1API with `boost` parameter for relevance
-2. **Search1API failures**: Fall back to SerpAPI with more specific query 
-3. **Perplexity failures**: Continue without enrichment, note to user
-4. **Multiple source failures**: Display partial results with clear indication of incomplete data
+## Authentication Errors
 
-## Performance Degradation Handling
+| Code | Meaning | Retry Strategy |
+|------|---------|----------------|
+| `AUTH_001` | API key expired | Do not retry; request new API key |
+| `AUTH_002` | API key unauthorized | Do not retry; check permissions |
+| `AUTH_003` | API key usage exceeded | Wait until next quota period and retry |
 
-If any search tool exceeds the 1s latency target:
+## Performance Monitoring
 
-1. Reduce `num_results` / `limit` parameters
-2. Set stricter `fields` parameter to minimize payload
-3. Fall back to cached results if available
-4. Note latency issue to user if all options exhausted
+When an error occurs and a retry strategy is attempted, log the following information:
 
-## Error Logging
+1. Error code
+2. Original error message
+3. Retry attempt number
+4. Retry delay
+5. Success/failure of retry
+6. Total time to resolution
 
-All errors should be logged with:
-- Error code
-- Source tool and parameters (sanitized)
-- Timestamp
-- Response time
-- Retry attempt number
-
-## Updating This Document
-
-Add new error codes as they are encountered. For each new error:
-1. Assign appropriate code in the correct range
-2. Document clear retry/recovery strategy
-3. Update MCP server handlers to recognize new codes
+This information is used to track and improve system reliability and performance.
 
 _Last updated: 2025-04-21_
