@@ -10,15 +10,15 @@ dotenv.config();
 const app = express();
 const PORT = process.env.SERVER_PORT || 3001;
 
-// API Keys from environment - using the correct ones from your knowledge files
-const SERPAPI_KEY = process.env.SERPAPI_API_KEY; // sk_c33fc85ca53ef6bca74b03d67ad14b19
-const SEARCH1_KEY = process.env.SEARCH1_API_KEY; // sk_s1_2b9ef10ca5bde9e83a7d41f4ad4d39b7
-const PERPLEXITY_KEY = process.env.PERPLEXITY_API_KEY; // pplx_5a78d1be73acc48abb4a1cf09d8b32a6c8
+// API Keys from environment
+const SERPAPI_KEY = process.env.SERPAPI_API_KEY;
+const SEARCH1_KEY = process.env.SEARCH1_API_KEY;
+const PERPLEXITY_KEY = process.env.PERPLEXITY_API_KEY;
 
 // API Endpoints
-const SERPAPI_ENDPOINT = process.env.SERPAPI_ENDPOINT;
-const SEARCH1_ENDPOINT = process.env.SEARCH1_ENDPOINT;
-const PERPLEXITY_ENDPOINT = process.env.PERPLEXITY_ENDPOINT;
+const SERPAPI_ENDPOINT = process.env.SERPAPI_ENDPOINT || 'https://serpapi.com/search';
+const SEARCH1_ENDPOINT = process.env.SEARCH1_ENDPOINT || 'https://api.search1.com/search';
+const PERPLEXITY_ENDPOINT = process.env.PERPLEXITY_ENDPOINT || 'https://api.perplexity.ai/search';
 
 // Middleware
 app.use(cors());
@@ -60,41 +60,51 @@ app.post('/api/mcp/serpapi_search', async (req, res) => {
     console.log(`SerpAPI search: ${query}`);
     console.log(`Using SerpAPI key: ${SERPAPI_KEY.substring(0, 5)}...`);
     
-    // Mock response for now (would be actual API call)
-    const mockResponse = {
+    // Build SerpAPI request params
+    const params = {
+      q: query,
+      engine: 'google_shopping',
+      api_key: SERPAPI_KEY,
+      num: num_results,
+      no_cache: no_cache
+    };
+    
+    // Make API request to SerpAPI with timeout to ensure p95 latency ≤ 1 second
+    const response = await axios.get(SERPAPI_ENDPOINT, { 
+      params,
+      timeout: 950 // 950ms timeout to ensure we stay under 1s total latency
+    });
+    
+    // Transform response to match our expected format
+    const results = response.data.shopping_results || [];
+    const transformedResults = results.map((item, index) => ({
+      id: `serp_${index + 1}`,
+      title: item.title,
+      price: item.price,
+      img_url: item.thumbnail,
+      source: 'SerpAPI',
+      link: item.link,
+      rating: item.rating,
+      reviews_count: item.reviews
+    }));
+    
+    // Send response
+    res.json({
       status: 'success',
-      results: [
-        {
-          id: 'serp_1',
-          title: 'Example Product 1',
-          price: '$99.99',
-          img_url: 'https://example.com/img1.jpg',
-          source: 'SerpAPI',
-          link: 'https://example.com/product1'
-        },
-        {
-          id: 'serp_2',
-          title: 'Example Product 2',
-          price: '$149.99',
-          img_url: 'https://example.com/img2.jpg',
-          source: 'SerpAPI',
-          link: 'https://example.com/product2'
-        }
-      ],
+      results: transformedResults,
       metadata: {
-        total_results: 100,
+        total_results: response.data.search_information?.total_results || results.length,
         engine: 'google_shopping',
         cached: !no_cache
       }
-    };
-    
-    // Simulate API response time
-    setTimeout(() => {
-      res.json(mockResponse);
-    }, 150); // 150ms delay
+    });
   } catch (error) {
     console.error('Error in SerpAPI MCP tool:', error);
-    res.status(500).json({ error: 'MCP_001: SerpAPI request failed' });
+    // Send error response with appropriate status code
+    res.status(error.response?.status || 500).json({ 
+      error: 'MCP_001: SerpAPI request failed',
+      details: error.message
+    });
   }
 });
 
@@ -107,51 +117,60 @@ app.post('/api/mcp/search1_query', async (req, res) => {
     console.log(`Search1API query: ${q}`);
     console.log(`Using Search1API key: ${SEARCH1_KEY.substring(0, 5)}...`);
     
-    // Mock response for now
-    const mockResponse = {
-      status: 'success',
-      results: [
-        {
-          id: 'search1_1',
-          title: 'Premium Product A',
-          price: '$129.99',
-          img_url: 'https://example.com/premium1.jpg',
-          source: 'Search1API',
-          link: 'https://example.com/premium1',
-          rating: 4.7,
-          reviews_count: 128
-        },
-        {
-          id: 'search1_2',
-          title: 'Premium Product B',
-          price: '$89.99',
-          img_url: 'https://example.com/premium2.jpg',
-          source: 'Search1API',
-          link: 'https://example.com/premium2',
-          rating: 4.5,
-          reviews_count: 94
-        }
-      ],
-      facets: {
-        brand: [
-          { value: 'BrandA', count: 24 },
-          { value: 'BrandB', count: 18 }
-        ],
-        price_range: [
-          { value: 'Under $50', count: 12 },
-          { value: '$50-$100', count: 45 },
-          { value: 'Over $100', count: 67 }
-        ]
-      }
+    // Build Search1API request body
+    const requestBody = {
+      query: q,
+      filters,
+      facets,
+      boost,
+      api_key: SEARCH1_KEY
     };
     
-    // Simulate API response time
-    setTimeout(() => {
-      res.json(mockResponse);
-    }, 120); // 120ms delay
+    // Make API request to Search1API with timeout
+    const response = await axios.post(SEARCH1_ENDPOINT, requestBody, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SEARCH1_KEY}`
+      },
+      timeout: 950 // 950ms timeout
+    });
+    
+    // Transform response to match our expected format
+    const results = response.data.hits || [];
+    const transformedResults = results.map((item, index) => ({
+      id: `search1_${index + 1}`,
+      title: item.title || item.name,
+      price: item.price_formatted || `$${item.price}`,
+      img_url: item.image_url || item.thumbnail,
+      source: 'Search1API',
+      link: item.product_url || item.url,
+      rating: item.rating,
+      reviews_count: item.reviews_count || item.review_count
+    }));
+    
+    // Extract facets from response
+    const transformedFacets = {};
+    if (response.data.facets) {
+      Object.keys(response.data.facets).forEach(facetName => {
+        transformedFacets[facetName] = response.data.facets[facetName].map(f => ({
+          value: f.value,
+          count: f.count
+        }));
+      });
+    }
+    
+    // Send response
+    res.json({
+      status: 'success',
+      results: transformedResults,
+      facets: transformedFacets
+    });
   } catch (error) {
     console.error('Error in Search1API MCP tool:', error);
-    res.status(500).json({ error: 'MCP_005: Search1API request failed' });
+    res.status(error.response?.status || 500).json({ 
+      error: 'MCP_005: Search1API request failed',
+      details: error.message
+    });
   }
 });
 
@@ -169,44 +188,81 @@ app.post('/api/mcp/perplexity_search', async (req, res) => {
     console.log(`Perplexity search: ${query}`);
     console.log(`Using Perplexity key: ${PERPLEXITY_KEY.substring(0, 5)}...`);
     
-    // Mock response for now
-    const mockResponse = {
-      status: 'success',
-      results: {
-        query: query,
-        enrichment: [
-          {
-            topic: 'Product Features',
-            content: 'This product category typically features high-durability materials, water resistance up to 30 meters, and battery life ranging from 10-14 hours of continuous use.',
-            sources: [
-              'https://example.com/product-guide'
-            ]
-          },
-          {
-            topic: 'Consumer Reviews',
-            content: 'Recent consumer surveys show 87% satisfaction with products in this category, with particular emphasis on ease-of-use and value for money.',
-            sources: [
-              'https://example.com/consumer-report-2024'
-            ]
-          }
-        ],
-        recommendations: [
-          {
-            id: 'pplx_1',
-            title: 'Most Recommended Option',
-            reasons: ['Best value for money', 'Highest customer satisfaction']
-          }
-        ]
-      }
+    // Build Perplexity request body
+    const requestBody = {
+      query,
+      model,
+      context_size,
+      domain_filter
     };
     
-    // Simulate API response time
-    setTimeout(() => {
-      res.json(mockResponse);
-    }, 180); // 180ms delay
+    // Make API request to Perplexity with timeout
+    const response = await axios.post(PERPLEXITY_ENDPOINT, requestBody, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${PERPLEXITY_KEY}`
+      },
+      timeout: 950 // 950ms timeout
+    });
+    
+    // Transform response into enrichment format
+    const enrichment = [];
+    
+    if (response.data.answer) {
+      // Extract product features from the answer
+      enrichment.push({
+        topic: 'Product Features',
+        content: response.data.answer.text.substring(0, 200), // Limit to avoid overly long content
+        sources: response.data.answer.web_search_citations || []
+      });
+    }
+    
+    if (response.data.topics) {
+      response.data.topics.forEach(topic => {
+        enrichment.push({
+          topic: topic.name,
+          content: topic.summary || topic.description,
+          sources: topic.sources || []
+        });
+      });
+    }
+    
+    // If enrichment is still empty, create a default entry
+    if (enrichment.length === 0 && response.data) {
+      enrichment.push({
+        topic: 'Product Information',
+        content: 'Information about this product category is limited. Consider trying a more specific search.',
+        sources: []
+      });
+    }
+    
+    // Add recommendations if available
+    const recommendations = [];
+    if (response.data.recommendations) {
+      response.data.recommendations.forEach((rec, index) => {
+        recommendations.push({
+          id: `pplx_${index + 1}`,
+          title: rec.title || rec.name,
+          reasons: rec.reasons || [rec.description || 'Recommended based on your search']
+        });
+      });
+    }
+    
+    // Send response
+    res.json({
+      status: 'success',
+      results: {
+        query,
+        enrichment,
+        recommendations
+      }
+    });
   } catch (error) {
     console.error('Error in Perplexity MCP tool:', error);
-    res.status(500).json({ error: 'MCP_009: Perplexity request failed' });
+    res.status(error.response?.status || 500).json({ 
+      error: 'MCP_009: Perplexity request failed',
+      details: error.message
+    });
   }
 });
 
@@ -230,23 +286,36 @@ app.post('/api/mcp/multi_source_search', async (req, res) => {
       requests.push(axios.post('http://localhost:' + PORT + '/api/mcp/serpapi_search', { 
         query, 
         num_results: max_results 
+      }).catch(error => {
+        console.error('SerpAPI search failed:', error.message);
+        return { data: { results: [] } }; // Return empty results on error
       }));
     }
     
     if (sources.includes('search1')) {
       requests.push(axios.post('http://localhost:' + PORT + '/api/mcp/search1_query', { 
         q: query 
+      }).catch(error => {
+        console.error('Search1API query failed:', error.message);
+        return { data: { results: [] } }; // Return empty results on error
       }));
     }
     
     if (sources.includes('perplexity')) {
       requests.push(axios.post('http://localhost:' + PORT + '/api/mcp/perplexity_search', { 
         query 
+      }).catch(error => {
+        console.error('Perplexity search failed:', error.message);
+        return { data: { results: { enrichment: [] } } }; // Return empty enrichment on error
       }));
     }
     
-    // Combine results from all sources
-    Promise.all(requests)
+    // Combine results from all sources with timeout to ensure p95 latency ≤ 1 second
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Request timeout: exceeded 950ms')), 950);
+    });
+    
+    Promise.race([Promise.all(requests), timeoutPromise])
       .then(responses => {
         // Combine and process results
         const combinedResults = {
@@ -305,11 +374,17 @@ app.post('/api/mcp/multi_source_search', async (req, res) => {
       })
       .catch(error => {
         console.error('Error in multi-source search:', error);
-        res.status(500).json({ error: 'MCP_013: Multi-source search failed' });
+        res.status(500).json({ 
+          error: 'MCP_013: Multi-source search failed',
+          details: error.message
+        });
       });
   } catch (error) {
     console.error('Error in multi-source search setup:', error);
-    res.status(500).json({ error: 'MCP_013: Multi-source search failed' });
+    res.status(500).json({ 
+      error: 'MCP_013: Multi-source search failed',
+      details: error.message
+    });
   }
 });
 
