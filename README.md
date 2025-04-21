@@ -1,71 +1,105 @@
-# Smart Shopper - AI-Powered Shopping Assistant
+# Smart Shopper - Claude MCP Shopping Assistant
 
-Smart Shopper is an AI-powered shopping assistant that leverages Claude and custom MCP tools to provide intelligent product recommendations, comparisons, and enriched information - all within 1 second of a user query.
+## ⚠️ IMPORTANT: MODEL CONTEXT PROTOCOL ARCHITECTURE
 
-## Core Features
+This project implements a **Model Context Protocol (MCP)** architecture where Claude directly interacts with dedicated MCP servers rather than using traditional REST APIs.
 
-- **Natural Language Shopping**: Users express their shopping needs conversationally
-- **Sub-Second Response**: All recommendations appear within 1 second
-- **Rich Visual Experience**: Products displayed in customizable, interactive layouts
-- **Data-Enriched Results**: Product data enhanced with reviews, comparisons, and context
-- **AI-Powered Recommendations**: Claude analyzes results and provides insights
+### Key Implementation Points:
+- **NO traditional API middleware** - Claude uses MCP tools directly
+- **Separate adapter-based MCP servers** for each data source
+- **Follow /docs/Smart-Shopper-AI structure** for implementation
+
+## Project Overview
+
+Smart Shopper transforms a chat interface into an AI-powered shopping concierge that helps users find, compare, and visualize products through natural language. The system uses Claude's reasoning abilities with specialized MCP tools to deliver thoughtful, high-quality results.
 
 ## Technical Architecture
 
-Smart Shopper is built on a Model Context Protocol (MCP) architecture with these key components:
+1. **MCP Server Structure** *(See `/docs/Smart-Shopper-AI/src/mcp-servers/`)*:
+   - Each source has its own dedicated MCP server
+   - Servers implement the `@modelcontextprotocol/sdk` interface
+   - Adapters standardize data between sources
+   - Multi-source server orchestrates parallel calls
 
-1. **Claude AI**: Powers natural language understanding and coordinates the shopping experience
-2. **MCP Tool Stack**: Custom servers that securely access external APIs for product data:
-   - SerpAPI for Google Shopping results
-   - Search1API for product indexing
-   - Perplexity for enrichment and context
-3. **Canvas Operations**: Interactive display for product cards, comparisons, and galleries
-4. **React Frontend**: Modern UI for natural language input and product display
+2. **Claude Integration Pattern**:
+   - Claude directly calls MCP tools using the provided protocol
+   - Follows PLAN → tool_use → PATCH → REFLECT workflow
+   - No middleware required between Claude and MCP servers
 
-## MCP Tools
-
-| Tool | Purpose | Key Parameters |
-|------|---------|----------------|
-| `serpapi_search` | Fetch Google Shopping results | `query`, `num_results`, `fields` |
-| `search1_query` | Query product database | `q`, `filters`, `facets`, `boost` |
-| `perplexity_search` | Enrich product information | `query`, `model`, `context_size` |
-| `multi_source_search` | Aggregate results from all sources | `query`, `sources`, `max_results`, `sort_by` |
-| `canvas_ops` | Manipulate product display | `op`, operation-specific parameters |
-| `claude_assist` | Get AI shopping assistance | `query`, `products`, `enrichment`, `context` |
-
-## Canvas Operations
-
-The canvas supports these operations:
-
-- `add_card`: Add or update a product card
-- `update_grid`: Change the grid layout and displayed products
-- `highlight_choice`: Highlight a recommended product
-- `undo_last`: Undo previous operations
-
-## Performance Optimizations
-
-- Parallel API calls to meet the ≤ 1 second latency requirement
-- Timeout mechanisms to ensure responses are always fast
-- Efficient state management in the React frontend
-- Caching options for repeated queries
+3. **Visual Canvas System**:
+   - Client-side rendering of product data
+   - Canvas operations (`add_card`, `update_grid`, etc.) control display
+   - Semantic operations replace direct DOM manipulation
 
 ## Getting Started
 
-1. Clone the repository
-2. Create a `.env` file with your API keys (see `.env.example`)
-3. Install dependencies: `npm install`
-4. Start the development server: `npm run dev`
+1. **Review Documentation First**:
+   - 📄 `/docs/project_instructions.md` - Core implementation guidelines
+   - 📄 `/docs/mcp_quick_guide.md` - Understanding MCP tools
+   - 📄 `/docs/Smart-Shopper-AI/` - Reference implementation
 
-## API Keys Required
+2. **Launch MCP Servers**:
+   ```bash
+   # Start all MCP servers
+   cd docs/Smart-Shopper-AI
+   npm install
+   npm start
+   ```
 
-- `SERPAPI_API_KEY`: For Google Shopping results
-- `SEARCH1_API_KEY`: For product database access
-- `PERPLEXITY_API_KEY`: For enrichment and context
+3. **Configure Environment**:
+   - Copy `.env.example` to `.env`
+   - Add API keys for SerpAPI, Search1API, and Perplexity
+
+4. **Start Frontend**:
+   ```bash
+   npm install
+   npm run dev
+   ```
+
+## MCP Tool Workflow
+
+```
+┌────────────┐     ┌──────────────┐     ┌───────────────┐
+│            │     │ MCP SERVERS  │     │              │
+│  Claude    │────▶│ - serpapi    │────▶│ Product      │
+│  Assistant │     │ - search1api │     │ Canvas       │
+│            │     │ - perplexity │     │              │
+└────────────┘     └──────────────┘     └───────────────┘
+      │                                         ▲
+      │           PLAN → tool_use → PATCH      │
+      └─────────────────────────────────────────┘
+```
+
+## Priority Guidelines
+
+1. **User Experience** - Prioritize quality over speed; show Claude's thinking
+2. **Clarify Ambiguity** - Ask questions before making API calls when needed
+3. **MCP Architecture** - Never use raw REST calls; always use MCP tools
+4. **Thoughtful Tools** - Use tools in a considered sequence, not just for speed
+5. **Visual Clarity** - Communicate loading states and thinking processes
+
+## MCP Tool Inventory
+
+| Tool | Purpose | Implementation Path |
+|------|---------|---------------------|
+| `serpapi_search` | Google Shopping results | `/mcp-servers/serpapi/` |
+| `search1_query` | Product database search | `/mcp-servers/search1api/` |
+| `perplexity_search` | Context enrichment | `/mcp-servers/perplexity/` |
+| `multi_source_search` | Combined search | `/mcp-servers/multi-source/` |
+
+## Canvas Operations
+
+| Operation | Purpose | Parameters |
+|-----------|---------|------------|
+| `add_card` | Add/update product | `id`, `title`, `price`, `img_url`, `source` |
+| `update_grid` | Change layout | `items[]`, `layout` |
+| `highlight_choice` | Mark recommendation | `id`, `reason` |
+| `undo_last` | Revert operation | `n` |
 
 ## Contributing
 
-See the [CONTRIBUTING.md](./CONTRIBUTING.md) file for contribution guidelines.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
 
 ## License
 
-See the [LICENSE](./LICENSE) file for details.
+This project is licensed under the terms specified in [LICENSE](./LICENSE).
