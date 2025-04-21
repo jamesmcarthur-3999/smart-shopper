@@ -132,6 +132,199 @@
           }
         }
       }
+    },
+    "canvas_ops": {
+      "description": "Execute operations on the product canvas display",
+      "parameters": {
+        "type": "object",
+        "required": ["op"],
+        "properties": {
+          "op": {
+            "type": "string",
+            "description": "Operation type",
+            "enum": ["add_card", "update_grid", "highlight_choice", "undo_last"]
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": { "op": { "const": "add_card" } }
+            },
+            "then": {
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique ID for the product card"
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Product title"
+                },
+                "price": {
+                  "type": "string",
+                  "description": "Product price (formatted)"
+                },
+                "img_url": {
+                  "type": "string",
+                  "description": "URL to product image"
+                },
+                "source": {
+                  "type": "string",
+                  "description": "Source of the product data"
+                },
+                "link": {
+                  "type": "string",
+                  "description": "URL to product details"
+                },
+                "rating": {
+                  "type": "number",
+                  "description": "Product rating (0-5)"
+                },
+                "reviews_count": {
+                  "type": "integer",
+                  "description": "Number of reviews"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Product description"
+                },
+                "metadata": {
+                  "type": "object",
+                  "description": "Additional product metadata",
+                  "additionalProperties": true
+                }
+              },
+              "required": ["id", "title", "price", "source"]
+            }
+          },
+          {
+            "if": {
+              "properties": { "op": { "const": "update_grid" } }
+            },
+            "then": {
+              "properties": {
+                "items": {
+                  "type": "array",
+                  "description": "Array of product IDs to display",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "layout": {
+                  "type": "object",
+                  "description": "Grid layout configuration",
+                  "properties": {
+                    "columns": {
+                      "type": "integer",
+                      "description": "Number of columns in the grid"
+                    },
+                    "rows": {
+                      "type": "integer",
+                      "description": "Number of rows (optional)"
+                    },
+                    "gap": {
+                      "type": "string",
+                      "description": "CSS gap value (e.g., '1rem')"
+                    },
+                    "itemWidth": {
+                      "type": "string",
+                      "description": "CSS width value for items"
+                    },
+                    "itemHeight": {
+                      "type": "string",
+                      "description": "CSS height value for items"
+                    }
+                  },
+                  "required": ["columns"]
+                }
+              },
+              "required": ["items"]
+            }
+          },
+          {
+            "if": {
+              "properties": { "op": { "const": "highlight_choice" } }
+            },
+            "then": {
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "ID of the product to highlight"
+                },
+                "reason": {
+                  "type": "string",
+                  "description": "Reason for highlighting this product"
+                }
+              },
+              "required": ["id"]
+            }
+          },
+          {
+            "if": {
+              "properties": { "op": { "const": "undo_last" } }
+            },
+            "then": {
+              "properties": {
+                "n": {
+                  "type": "integer",
+                  "description": "Number of operations to undo",
+                  "default": 1
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "claude_assist": {
+      "description": "Get intelligent shopping assistance from Claude AI",
+      "parameters": {
+        "type": "object",
+        "required": ["query"],
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The user's shopping query"
+          },
+          "products": {
+            "type": "array",
+            "description": "Product data from search results",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "title": { "type": "string" },
+                "price": { "type": "string" },
+                "source": { "type": "string" },
+                "img_url": { "type": "string" },
+                "link": { "type": "string" },
+                "rating": { "type": "number" },
+                "reviews_count": { "type": "integer" }
+              }
+            }
+          },
+          "enrichment": {
+            "type": "array",
+            "description": "Enrichment data from Perplexity",
+            "items": {
+              "type": "object",
+              "properties": {
+                "topic": { "type": "string" },
+                "content": { "type": "string" },
+                "sources": { 
+                  "type": "array",
+                  "items": { "type": "string" }
+                }
+              }
+            }
+          },
+          "context": {
+            "type": "object",
+            "description": "Additional context for Claude",
+            "additionalProperties": true
+          }
+        }
+      }
     }
   }
 }
