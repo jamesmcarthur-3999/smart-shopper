@@ -1,60 +1,98 @@
 /**
- * Kill processes using specific ports
- * 
- * This script finds and terminates any processes using 
- * port 3000 (React app) and 3001 (API server) before starting
+ * Port management script for Smart Shopper
+ * This script checks if ports 3000 and 3001 are in use and kills any processes using them
  */
 
 const { execSync } = require('child_process');
+const process = require('process');
+const os = require('os');
 
-// Ports to check and kill
+// Ports to check
 const PORTS = [3000, 3001];
 
-console.log('🔍 Checking for processes using ports 3000 and 3001...');
-
-PORTS.forEach(port => {
+// Function to check if a port is in use and optionally kill the process
+const checkPort = (port) => {
   try {
-    // Find process ID using the port
-    // Using different commands for macOS and Linux/Windows
+    console.log(`🔍 Checking for processes using ports ${PORTS.join(' and ')}...`);
+    
     let cmd;
-    if (process.platform === 'darwin') {
-      // macOS
-      cmd = `lsof -i :${port} -t`;
-    } else if (process.platform === 'win32') {
+    let processInfo;
+    
+    // Different commands based on operating system
+    if (os.platform() === 'win32') {
       // Windows
       cmd = `netstat -ano | findstr :${port}`;
-    } else {
-      // Linux
-      cmd = `lsof -i :${port} -t`;
-    }
-
-    const result = execSync(cmd, { encoding: 'utf8' }).trim();
-    
-    if (result) {
-      const pids = result.split('\n');
+      try {
+        processInfo = execSync(cmd, { stdio: ['pipe', 'pipe', 'ignore'] }).toString();
+      } catch (e) {
+        // If the command fails, it likely means no process is using the port
+        return { inUse: false, pid: null };
+      }
       
-      pids.forEach(pid => {
+      // Extract PID from the output (last column in netstat)
+      const pidMatch = processInfo.match(/(\d+)$/m);
+      if (pidMatch && pidMatch[1]) {
+        return { inUse: true, pid: pidMatch[1] };
+      }
+    } else {
+      // macOS, Linux, etc.
+      cmd = `lsof -i:${port} -t`;
+      try {
+        const pid = execSync(cmd, { stdio: ['pipe', 'pipe', 'ignore'] }).toString().trim();
         if (pid) {
-          console.log(`🛑 Killing process ${pid} using port ${port}`);
-          try {
-            if (process.platform === 'win32') {
-              execSync(`taskkill /F /PID ${pid}`);
-            } else {
-              execSync(`kill -9 ${pid}`);
-            }
-            console.log(`✅ Process ${pid} killed successfully`);
-          } catch (error) {
-            console.error(`❌ Failed to kill process ${pid}: ${error.message}`);
-          }
+          return { inUse: true, pid };
         }
-      });
+      } catch (e) {
+        // If the command fails, it likely means no process is using the port
+        return { inUse: false, pid: null };
+      }
+    }
+    
+    return { inUse: false, pid: null };
+  } catch (error) {
+    console.error(`Error checking port ${port}:`, error.message);
+    return { inUse: false, pid: null, error: error.message };
+  }
+};
+
+// Function to kill a process by PID
+const killProcess = (pid) => {
+  try {
+    if (os.platform() === 'win32') {
+      execSync(`taskkill /F /PID ${pid}`);
+    } else {
+      execSync(`kill -9 ${pid}`);
+    }
+    return true;
+  } catch (error) {
+    console.error(`Error killing process ${pid}:`, error.message);
+    return false;
+  }
+};
+
+// Main execution
+const main = () => {
+  // Check each port
+  for (const port of PORTS) {
+    const { inUse, pid } = checkPort(port);
+    
+    if (inUse && pid) {
+      console.log(`⚠️ Port ${port} is in use by process ${pid}. Attempting to kill...`);
+      const killed = killProcess(pid);
+      if (killed) {
+        console.log(`✅ Successfully killed process using port ${port}`);
+      } else {
+        console.error(`❌ Failed to kill process using port ${port}`);
+        console.error(`   Please manually kill the process and try again.`);
+        process.exit(1);
+      }
     } else {
       console.log(`✓ No process found using port ${port}`);
     }
-  } catch (error) {
-    // If the execSync command fails, it means no process is using the port
-    console.log(`✓ No process found using port ${port}`);
   }
-});
+  
+  console.log('✅ Port check complete. Safe to start the application.');
+};
 
-console.log('✅ Port check complete. Safe to start the application.');
+// Run the script
+main();
