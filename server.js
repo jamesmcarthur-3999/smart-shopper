@@ -388,6 +388,200 @@ app.post('/api/mcp/multi_source_search', async (req, res) => {
   }
 });
 
+// Canvas Operations MCP Tool
+app.post('/api/mcp/canvas_ops', async (req, res) => {
+  try {
+    const operation = req.body;
+    
+    // Log the operation
+    console.log(`Canvas operation received: ${operation.op}`);
+    
+    // Validate operation type
+    if (!operation.op) {
+      return res.status(400).json({
+        error: 'MCP_020: Invalid canvas operation',
+        details: 'Operation type (op) is required'
+      });
+    }
+    
+    // Process operation based on type
+    switch (operation.op) {
+      case 'add_card':
+        // Validate required fields
+        if (!operation.id || !operation.title || !operation.price || !operation.source) {
+          return res.status(400).json({
+            error: 'MCP_021: Invalid add_card operation',
+            details: 'Missing required fields (id, title, price, source)'
+          });
+        }
+        break;
+        
+      case 'update_grid':
+        // Validate required fields
+        if (!operation.items || !Array.isArray(operation.items)) {
+          return res.status(400).json({
+            error: 'MCP_022: Invalid update_grid operation',
+            details: 'Missing or invalid items array'
+          });
+        }
+        break;
+        
+      case 'highlight_choice':
+        // Validate required fields
+        if (!operation.id) {
+          return res.status(400).json({
+            error: 'MCP_023: Invalid highlight_choice operation',
+            details: 'Missing required field (id)'
+          });
+        }
+        break;
+        
+      case 'undo_last':
+        // No validation needed
+        break;
+        
+      default:
+        return res.status(400).json({
+          error: 'MCP_024: Unknown canvas operation',
+          details: `Operation type '${operation.op}' is not supported`
+        });
+    }
+    
+    // Return success response
+    // In a full implementation, this would update some server-side state
+    // or trigger other side effects based on the operation
+    res.json({
+      status: 'success',
+      operation: operation.op,
+      message: 'Canvas operation processed successfully'
+    });
+  } catch (error) {
+    console.error('Error in canvas operations MCP tool:', error);
+    res.status(500).json({
+      error: 'MCP_025: Canvas operation failed',
+      details: error.message
+    });
+  }
+});
+
+// Claude AI Assistant MCP Tool
+app.post('/api/mcp/claude_assist', async (req, res) => {
+  try {
+    const { query, products, enrichment, context } = req.body;
+    
+    // Log request
+    console.log(`Claude assistance request for query: ${query}`);
+    
+    // In a real implementation, this would make a request to Claude
+    // For now, let's simulate Claude's response with helpful shopping advice
+    
+    // Generate product recommendations based on the data
+    const productCount = products ? products.length : 0;
+    
+    // Simulate Claude's assistance response
+    const assistResponse = {
+      query,
+      recommendations: [],
+      insights: [],
+      canvas_operations: []
+    };
+    
+    // Add some simulated insights
+    if (enrichment && enrichment.length > 0) {
+      assistResponse.insights.push({
+        type: 'summary',
+        content: `Based on your search for "${query}", I found ${productCount} products that might be relevant.`
+      });
+      
+      assistResponse.insights.push({
+        type: 'analysis',
+        content: `The average price for these products is ${calculateAveragePrice(products)}. Products from ${getMostCommonSource(products)} tend to have the highest ratings.`
+      });
+    }
+    
+    // Add simulated canvas operations for demonstration
+    if (products && products.length > 0) {
+      // Find the highest rated product
+      const highestRated = [...products].sort((a, b) => (b.rating || 0) - (a.rating || 0))[0];
+      
+      if (highestRated) {
+        // Highlight the highest rated product
+        assistResponse.canvas_operations.push({
+          op: 'highlight_choice',
+          id: highestRated.id,
+          reason: 'Highest customer rating'
+        });
+      }
+      
+      // Update grid layout for better display
+      assistResponse.canvas_operations.push({
+        op: 'update_grid',
+        items: products.map(p => p.id).slice(0, 6), // Show top 6 products
+        layout: {
+          columns: 3,
+          gap: '1rem'
+        }
+      });
+    }
+    
+    // Send response with a slight delay to simulate processing
+    setTimeout(() => {
+      res.json({
+        status: 'success',
+        response: assistResponse
+      });
+    }, 100);
+  } catch (error) {
+    console.error('Error in Claude AI Assistant MCP tool:', error);
+    res.status(500).json({ 
+      error: 'MCP_030: Claude assistance request failed',
+      details: error.message
+    });
+  }
+});
+
+// Helper functions for Claude AI Assistant
+function calculateAveragePrice(products) {
+  if (!products || products.length === 0) {
+    return '$0.00';
+  }
+  
+  const prices = products.map(p => parseFloat(p.price.replace(/[^0-9.]/g, '')))
+    .filter(price => !isNaN(price));
+    
+  if (prices.length === 0) {
+    return '$0.00';
+  }
+  
+  const avgPrice = prices.reduce((sum, price) => sum + price, 0) / prices.length;
+  return `$${avgPrice.toFixed(2)}`;
+}
+
+function getMostCommonSource(products) {
+  if (!products || products.length === 0) {
+    return 'unknown sources';
+  }
+  
+  const sourceCounts = {};
+  products.forEach(p => {
+    if (p.source) {
+      sourceCounts[p.source] = (sourceCounts[p.source] || 0) + 1;
+    }
+  });
+  
+  let mostCommonSource = null;
+  let highestCount = 0;
+  
+  Object.keys(sourceCounts).forEach(source => {
+    if (sourceCounts[source] > highestCount) {
+      mostCommonSource = source;
+      highestCount = sourceCounts[source];
+    }
+  });
+  
+  return mostCommonSource || 'unknown sources';
+}
+
 // Catch-all route to serve React app
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
