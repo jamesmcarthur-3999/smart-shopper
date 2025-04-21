@@ -3,6 +3,7 @@ const path = require('path');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const axios = require('axios');
+const ClaudeClient = require('./scripts/claude-client');
 
 // Load environment variables
 dotenv.config();
@@ -14,11 +15,18 @@ const PORT = process.env.SERVER_PORT || 3001;
 const SERPAPI_KEY = process.env.SERPAPI_API_KEY;
 const SEARCH1_KEY = process.env.SEARCH1_API_KEY;
 const PERPLEXITY_KEY = process.env.PERPLEXITY_API_KEY;
+const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY;
 
 // API Endpoints
 const SERPAPI_ENDPOINT = process.env.SERPAPI_ENDPOINT || 'https://serpapi.com/search';
 const SEARCH1_ENDPOINT = process.env.SEARCH1_ENDPOINT || 'https://api.search1.com/search';
 const PERPLEXITY_ENDPOINT = process.env.PERPLEXITY_ENDPOINT || 'https://api.perplexity.ai/search';
+
+// Initialize Claude client
+const claudeClient = new ClaudeClient({
+  apiKey: CLAUDE_API_KEY,
+  maxTokens: 1024
+});
 
 // Middleware
 app.use(cors());
@@ -471,66 +479,73 @@ app.post('/api/mcp/claude_assist', async (req, res) => {
     
     // Log request
     console.log(`Claude assistance request for query: ${query}`);
+    console.log(`Using Claude API key: ${CLAUDE_API_KEY ? CLAUDE_API_KEY.substring(0, 5) + '...' : 'Not set'}`);
     
-    // In a real implementation, this would make a request to Claude
-    // For now, let's simulate Claude's response with helpful shopping advice
-    
-    // Generate product recommendations based on the data
-    const productCount = products ? products.length : 0;
-    
-    // Simulate Claude's assistance response
-    const assistResponse = {
-      query,
-      recommendations: [],
-      insights: [],
-      canvas_operations: []
-    };
-    
-    // Add some simulated insights
-    if (enrichment && enrichment.length > 0) {
-      assistResponse.insights.push({
-        type: 'summary',
-        content: `Based on your search for "${query}", I found ${productCount} products that might be relevant.`
-      });
+    // Check if Claude API key is available
+    if (!CLAUDE_API_KEY) {
+      console.warn('Claude API key not set, using simulated response');
       
-      assistResponse.insights.push({
-        type: 'analysis',
-        content: `The average price for these products is ${calculateAveragePrice(products)}. Products from ${getMostCommonSource(products)} tend to have the highest ratings.`
-      });
-    }
-    
-    // Add simulated canvas operations for demonstration
-    if (products && products.length > 0) {
-      // Find the highest rated product
-      const highestRated = [...products].sort((a, b) => (b.rating || 0) - (a.rating || 0))[0];
+      // Simulate Claude's assistance response
+      const simulatedResponse = {
+        query,
+        insights: [
+          {
+            type: 'summary',
+            content: `Based on your search for "${query}", I found ${products.length} products that might be relevant.`
+          },
+          {
+            type: 'analysis',
+            content: `The average price for these products is ${calculateAveragePrice(products)}. Products from ${getMostCommonSource(products)} tend to have the highest ratings.`
+          }
+        ],
+        canvas_operations: []
+      };
       
-      if (highestRated) {
-        // Highlight the highest rated product
-        assistResponse.canvas_operations.push({
-          op: 'highlight_choice',
-          id: highestRated.id,
-          reason: 'Highest customer rating'
+      // Add simulated canvas operations for demonstration
+      if (products && products.length > 0) {
+        // Find the highest rated product
+        const highestRated = [...products].sort((a, b) => (b.rating || 0) - (a.rating || 0))[0];
+        
+        if (highestRated) {
+          // Highlight the highest rated product
+          simulatedResponse.canvas_operations.push({
+            op: 'highlight_choice',
+            id: highestRated.id,
+            reason: 'Highest customer rating'
+          });
+        }
+        
+        // Update grid layout for better display
+        simulatedResponse.canvas_operations.push({
+          op: 'update_grid',
+          items: products.map(p => p.id).slice(0, 6), // Show top 6 products
+          layout: {
+            columns: 3,
+            gap: '1rem'
+          }
         });
       }
       
-      // Update grid layout for better display
-      assistResponse.canvas_operations.push({
-        op: 'update_grid',
-        items: products.map(p => p.id).slice(0, 6), // Show top 6 products
-        layout: {
-          columns: 3,
-          gap: '1rem'
-        }
+      // Send simulated response
+      return res.json({
+        status: 'success',
+        response: simulatedResponse
       });
     }
     
-    // Send response with a slight delay to simulate processing
-    setTimeout(() => {
-      res.json({
-        status: 'success',
-        response: assistResponse
-      });
-    }, 100);
+    // Use Claude client to get shopping assistance
+    const assistResponse = await claudeClient.getShoppingAssistance({
+      query,
+      products,
+      enrichment,
+      context
+    });
+    
+    // Send Claude's response
+    res.json({
+      status: 'success',
+      response: assistResponse
+    });
   } catch (error) {
     console.error('Error in Claude AI Assistant MCP tool:', error);
     res.status(500).json({ 
@@ -590,6 +605,6 @@ app.get('*', (req, res) => {
 // Start server
 app.listen(PORT, () => {
   console.log(`Smart Shopper MCP server running on port ${PORT}`);
-  console.log(`API Keys configured: ${Boolean(SERPAPI_KEY)} | ${Boolean(SEARCH1_KEY)} | ${Boolean(PERPLEXITY_KEY)}`);
+  console.log(`API Keys configured: ${Boolean(SERPAPI_KEY)} | ${Boolean(SEARCH1_KEY)} | ${Boolean(PERPLEXITY_KEY)} | ${Boolean(CLAUDE_API_KEY)}`);
   console.log(`Environment: ${process.env.NODE_ENV}`);
 });
