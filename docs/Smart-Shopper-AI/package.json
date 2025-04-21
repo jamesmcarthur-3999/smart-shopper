@@ -1,0 +1,53 @@
+{
+  "name": "smart-shopper-ai",
+  "version": "0.1.0",
+  "description": "MCP server implementations for Smart Shopper",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "build:all": "npm run build",
+    "start": "node dist/index.js",
+    "start:serpapi": "node dist/mcp-servers/serpapi/index.js",
+    "start:search1api": "node dist/mcp-servers/search1api/index.js",
+    "start:perplexity": "node dist/mcp-servers/perplexity/index.js",
+    "start:multi": "node dist/mcp-servers/multi-source/index.js",
+    "dev": "ts-node src/index.ts",
+    "dev:serpapi": "ts-node src/mcp-servers/serpapi/index.ts",
+    "dev:search1api": "ts-node src/mcp-servers/search1api/index.ts",
+    "dev:perplexity": "ts-node src/mcp-servers/perplexity/index.ts",
+    "dev:multi": "ts-node src/mcp-servers/multi-source/index.ts",
+    "test": "jest",
+    "lint": "eslint . --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\""
+  },
+  "keywords": [
+    "MCP",
+    "shopping",
+    "claude",
+    "AI",
+    "search"
+  ],
+  "author": "Smart Shopper Team",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.3.0",
+    "axios": "^1.6.7",
+    "dotenv": "^16.4.5",
+    "joi": "^17.12.2",
+    "node-cache": "^5.1.2",
+    "pino": "^8.18.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.11.24",
+    "@typescript-eslint/eslint-plugin": "^7.2.0",
+    "@typescript-eslint/parser": "^7.2.0",
+    "eslint": "^8.57.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.2.5",
+    "ts-jest": "^29.1.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}

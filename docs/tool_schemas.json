@@ -1,0 +1,204 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "tools": {
+    "serpapi_search": {
+      "description": "Search for products via Google Shopping (SerpAPI)",
+      "type": "object",
+      "required": ["query"],
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search query for products"
+        },
+        "fields": {
+          "type": "string",
+          "description": "Comma-separated list of fields to return",
+          "default": "shopping_results.price,title,thumbnail,link,source"
+        },
+        "num_results": {
+          "type": "integer",
+          "description": "Number of results to return",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 20
+        },
+        "no_cache": {
+          "type": "boolean",
+          "description": "If true, bypasses cache and performs a fresh search",
+          "default": false
+        }
+      }
+    },
+    "search1_query": {
+      "description": "Query the elastic product index",
+      "type": "object",
+      "required": ["q"],
+      "properties": {
+        "q": {
+          "type": "string",
+          "description": "Search query"
+        },
+        "filters": {
+          "type": "object",
+          "description": "Filters to apply to the search",
+          "additionalProperties": true
+        },
+        "facets": {
+          "type": "array",
+          "description": "Facets to return with the search results",
+          "items": {
+            "type": "string"
+          }
+        },
+        "boost": {
+          "type": "object",
+          "description": "Boost parameters for relevance scoring",
+          "properties": {
+            "field": {
+              "type": "string",
+              "description": "Field to boost"
+            },
+            "factor": {
+              "type": "number",
+              "description": "Boost factor",
+              "minimum": 0.1,
+              "maximum": 10
+            }
+          },
+          "required": ["field", "factor"]
+        },
+        "cursor": {
+          "type": "string",
+          "description": "Cursor for pagination"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of results to return",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 50
+        }
+      }
+    },
+    "perplexity_search": {
+      "description": "Enrich product data and provide citations",
+      "type": "object",
+      "required": ["query"],
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search query for product enrichment"
+        },
+        "model": {
+          "type": "string",
+          "description": "Perplexity model to use",
+          "enum": ["sonar-small-online", "sonar-medium-online", "sonar-large-online"],
+          "default": "sonar-small-online"
+        },
+        "context_size": {
+          "type": "string",
+          "description": "Amount of context to use",
+          "enum": ["small", "medium", "large"],
+          "default": "medium"
+        },
+        "domain_filter": {
+          "type": "array",
+          "description": "Domains to filter results to",
+          "items": {
+            "type": "string"
+          }
+        },
+        "include_domains": {
+          "type": "boolean",
+          "description": "Whether to include domain information in results",
+          "default": true
+        }
+      }
+    },
+    "add_card": {
+      "description": "Add a product card to the canvas",
+      "type": "object",
+      "required": ["id", "title", "price", "img_url", "source"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the card"
+        },
+        "title": {
+          "type": "string",
+          "description": "Product title"
+        },
+        "price": {
+          "type": "string",
+          "description": "Product price as formatted string"
+        },
+        "img_url": {
+          "type": "string",
+          "description": "URL of the product image"
+        },
+        "source": {
+          "type": "string",
+          "description": "Source of the product information"
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional product description"
+        },
+        "rating": {
+          "type": "number",
+          "description": "Optional product rating",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "review_count": {
+          "type": "integer",
+          "description": "Optional product review count",
+          "minimum": 0
+        }
+      }
+    },
+    "update_grid": {
+      "description": "Update the canvas grid layout",
+      "type": "object",
+      "required": ["items"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "description": "Array of item IDs to include in the grid",
+          "items": {
+            "type": "string"
+          }
+        },
+        "layout": {
+          "type": "string",
+          "description": "Grid layout type",
+          "enum": ["list", "grid", "comparison", "gallery"],
+          "default": "grid"
+        }
+      }
+    },
+    "highlight_choice": {
+      "description": "Highlight a product as selected/recommended",
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "ID of the product to highlight"
+        }
+      }
+    },
+    "undo_last": {
+      "description": "Undo the last n canvas operations",
+      "type": "object",
+      "properties": {
+        "n": {
+          "type": "integer",
+          "description": "Number of operations to undo",
+          "default": 1,
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

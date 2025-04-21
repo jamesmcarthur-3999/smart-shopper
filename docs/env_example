@@ -1,0 +1,39 @@
+# Smart Shopper Environment Variables
+# Copy this file to .env and fill in your API keys
+# NEVER commit .env files to the repository
+
+# Claude API key (required for AI assistance)
+CLAUDE_API_KEY=
+
+# SerpAPI key (required for Google Shopping results)
+SERPAPI_API_KEY=
+
+# Search1 API key (required for product search index)
+SEARCH1_API_KEY=
+
+# Perplexity API key (required for product enrichment)
+PPLX_API_KEY=
+
+# GitHub access token (optional, for CI/CD and automated repo operations)
+GITHUB_TOKEN=
+
+# Application settings
+APP_PORT=3000
+NODE_ENV=development
+LOG_LEVEL=info
+
+# Performance settings
+MAX_PARALLEL_CALLS=3
+TIMEOUT_MS=1000
+ENABLE_CACHING=true
+CACHE_TTL=600
+
+# Canvas settings
+DEFAULT_GRID_LAYOUT=grid
+MAX_CARDS_PER_VIEW=9
+ENABLE_ANIMATIONS=true
+
+# Service endpoints (do not change unless instructed)
+SERPAPI_ENDPOINT=https://serpapi.smartshopper.dev/api/v1
+SEARCH1_ENDPOINT=https://search1.smartshopper.dev/api/v1
+PERPLEXITY_ENDPOINT=https://perplexity.smartshopper.dev/api/v1
