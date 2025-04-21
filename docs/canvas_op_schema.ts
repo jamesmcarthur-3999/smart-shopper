@@ -1,112 +1,83 @@
 /**
  * Type definitions for Smart Shopper canvas operations
- * 
- * These types reflect the operations described in §5 of the Project Instructions
- * Last updated: 2025-04-21
+ * These operations are used to manipulate the visual product display
  */
 
+/**
+ * Product card data structure
+ */
 export interface ProductCard {
-  /** Unique identifier for the card */
   id: string;
-  
-  /** Product title */
   title: string;
-  
-  /** Product price as formatted string */
   price: string;
-  
-  /** URL of the product image */
-  img_url: string;
-  
-  /** Source of the product information */
+  img_url?: string;
   source: string;
-  
-  /** Optional product description */
-  description?: string;
-  
-  /** Optional product rating (0-5) */
+  link?: string;
   rating?: number;
-  
-  /** Optional product review count */
-  review_count?: number;
-  
-  /** Optional additional attributes as key-value pairs */
-  attributes?: Record<string, string | number | boolean>;
+  reviews_count?: number;
+  description?: string;
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Layout configuration for grid display
+ */
+export interface GridLayout {
+  columns: number;
+  rows?: number;
+  gap?: string;
+  itemWidth?: string;
+  itemHeight?: string;
 }
 
 /**
  * Add a product card to the canvas
  */
-export interface AddCardOp {
-  type: 'add_card';
-  
-  /** Card data */
-  card: ProductCard;
-}
-
-/**
- * Canvas grid layout options
- */
-export type GridLayout = 'list' | 'grid' | 'comparison' | 'gallery';
-
-/**
- * Update the canvas grid layout
- */
-export interface UpdateGridOp {
-  type: 'update_grid';
-  
-  /** Array of item IDs to include in the grid */
-  items: string[];
-  
-  /** Grid layout type */
-  layout: GridLayout;
-}
-
-/**
- * Highlight a product as selected/recommended
- */
-export interface HighlightChoiceOp {
-  type: 'highlight_choice';
-  
-  /** ID of the product to highlight */
+export interface AddCardOperation {
+  op: 'add_card';
   id: string;
+  title: string; 
+  price: string;
+  img_url?: string;
+  source: string;
+  link?: string;
+  rating?: number;
+  reviews_count?: number;
+  description?: string;
+  metadata?: Record<string, any>;
 }
 
 /**
- * Undo the last n canvas operations
+ * Update the grid layout and displayed items
  */
-export interface UndoLastOp {
-  type: 'undo_last';
-  
-  /** Number of operations to undo */
-  n: number;
+export interface UpdateGridOperation {
+  op: 'update_grid';
+  items: string[]; // Array of product card IDs to display
+  layout?: GridLayout;
 }
 
 /**
- * Union type for all canvas operations
+ * Highlight a specific product card as the recommended choice
+ */
+export interface HighlightChoiceOperation {
+  op: 'highlight_choice';
+  id: string; // Product card ID to highlight
+  reason?: string; // Optional reason for highlighting this choice
+}
+
+/**
+ * Undo the last N canvas operations
+ */
+export interface UndoLastOperation {
+  op: 'undo_last';
+  n?: number; // Number of operations to undo (default: 1)
+}
+
+/**
+ * Union type of all canvas operations
  */
 export type CanvasOperation = 
-  | AddCardOp
-  | UpdateGridOp
-  | HighlightChoiceOp
-  | UndoLastOp;
-
-/**
- * Canvas state interface
- */
-export interface CanvasState {
-  /** Map of product cards by ID */
-  cards: Record<string, ProductCard>;
-  
-  /** Current grid layout */
-  layout: GridLayout;
-  
-  /** Current ordered list of item IDs in the grid */
-  grid: string[];
-  
-  /** Currently highlighted item ID, if any */
-  highlighted?: string;
-  
-  /** Stack of operations for undo */
-  operationStack: CanvasOperation[];
-}
+  | AddCardOperation
+  | UpdateGridOperation
+  | HighlightChoiceOperation
+  | UndoLastOperation;
