@@ -64,6 +64,20 @@ type CanvasOperation =
   | HighlightChoiceOperation
   | UndoLastOperation;
 
+// Claude Assistant Response Interface
+interface ClaudeAssistResponse {
+  query: string;
+  recommendations: Array<{
+    id: string;
+    content: string;
+  }>;
+  insights: Array<{
+    type: string;
+    content: string;
+  }>;
+  canvas_operations: CanvasOperation[];
+}
+
 const App: React.FC = () => {
   const [query, setQuery] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
@@ -75,6 +89,7 @@ const App: React.FC = () => {
   const [gridLayout, setGridLayout] = useState<GridLayout>({ columns: 3 });
   const [displayedProductIds, setDisplayedProductIds] = useState<string[]>([]);
   const [operationHistory, setOperationHistory] = useState<CanvasOperation[]>([]);
+  const [assistantInsights, setAssistantInsights] = useState<Array<{type: string, content: string}>>([]);
 
   // Handle canvas operations
   const processCanvasOperation = useCallback((operation: CanvasOperation) => {
@@ -144,6 +159,53 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // Execute canvas operation
+  const executeCanvasOperation = useCallback(async (operation: CanvasOperation) => {
+    try {
+      // Call the canvas operations MCP tool
+      await axios.post('/api/mcp/canvas_ops', operation);
+      
+      // Process the operation locally
+      processCanvasOperation(operation);
+    } catch (error) {
+      console.error('Error executing canvas operation:', error);
+    }
+  }, [processCanvasOperation]);
+
+  // Get Claude AI assistance
+  const getClaudeAssistance = useCallback(async () => {
+    if (!query.trim() || products.length === 0) return;
+    
+    try {
+      const response = await axios.post('/api/mcp/claude_assist', {
+        query,
+        products,
+        enrichment,
+        context: {
+          displayed_products: displayedProductIds,
+          grid_layout: gridLayout
+        }
+      });
+      
+      const assistResponse: ClaudeAssistResponse = response.data.response;
+      
+      // Apply insights
+      if (assistResponse.insights && assistResponse.insights.length > 0) {
+        setAssistantInsights(assistResponse.insights);
+      }
+      
+      // Apply canvas operations
+      if (assistResponse.canvas_operations && assistResponse.canvas_operations.length > 0) {
+        // Execute each operation in sequence
+        for (const op of assistResponse.canvas_operations) {
+          await executeCanvasOperation(op);
+        }
+      }
+    } catch (error) {
+      console.error('Error getting Claude assistance:', error);
+    }
+  }, [query, products, enrichment, displayedProductIds, gridLayout, executeCanvasOperation]);
+
   // Filtered products based on displayed IDs
   const filteredProducts = displayedProductIds.length > 0
     ? products.filter(p => displayedProductIds.includes(p.id))
@@ -160,6 +222,7 @@ const App: React.FC = () => {
     setEnrichment([]);
     setHighlightedProductId(null);
     setHighlightReason(null);
+    setAssistantInsights([]);
     
     try {
       console.log('Searching for:', query);
@@ -182,6 +245,12 @@ const App: React.FC = () => {
       if (response.data.enrichment) {
         setEnrichment(response.data.enrichment);
       }
+      
+      // After search completes successfully, get Claude assistance
+      setTimeout(() => {
+        getClaudeAssistance();
+      }, 500); // Give a slight delay for state updates to complete
+      
     } catch (err) {
       console.error('Error fetching products:', err);
       setError('Failed to fetch products. Please try again.');
@@ -221,6 +290,18 @@ const App: React.FC = () => {
       
       {error && (
         <div className="text-red-600 text-center mb-4">{error}</div>
+      )}
+      
+      {/* Assistant Insights */}
+      {assistantInsights.length > 0 && (
+        <div className="mb-6 p-4 border border-green-200 bg-green-50 rounded-lg">
+          <h2 className="text-lg font-semibold mb-2 text-green-800">AI Assistant Insights</h2>
+          {assistantInsights.map((insight, index) => (
+            <div key={`insight-${index}`} className="mb-2">
+              <p className="text-sm">{insight.content}</p>
+            </div>
+          ))}
+        </div>
       )}
       
       {/* Product Enrichment Section */}
@@ -298,6 +379,19 @@ const App: React.FC = () => {
       {products.length === 0 && !loading && (
         <div className="text-center text-gray-500 mt-12">
           <p>Search for products to see results here</p>
+        </div>
+      )}
+      
+      {/* Loading indicator for Claude assistance */}
+      {loading && (
+        <div className="fixed bottom-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg">
+          <div className="flex items-center">
+            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>AI assistant is thinking...</span>
+          </div>
         </div>
       )}
     </div>
