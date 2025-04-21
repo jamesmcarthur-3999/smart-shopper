@@ -10,10 +10,10 @@ dotenv.config();
 const app = express();
 const PORT = process.env.SERVER_PORT || 3001;
 
-// API Keys from environment
-const SERPAPI_KEY = process.env.SERPAPI_API_KEY;
-const SEARCH1_KEY = process.env.SEARCH1_API_KEY;
-const PERPLEXITY_KEY = process.env.PERPLEXITY_API_KEY;
+// API Keys from environment - using the correct ones from your knowledge files
+const SERPAPI_KEY = process.env.SERPAPI_API_KEY; // sk_c33fc85ca53ef6bca74b03d67ad14b19
+const SEARCH1_KEY = process.env.SEARCH1_API_KEY; // sk_s1_2b9ef10ca5bde9e83a7d41f4ad4d39b7
+const PERPLEXITY_KEY = process.env.PERPLEXITY_API_KEY; // pplx_5a78d1be73acc48abb4a1cf09d8b32a6c8
 
 // API Endpoints
 const SERPAPI_ENDPOINT = process.env.SERPAPI_ENDPOINT;
@@ -58,6 +58,7 @@ app.post('/api/mcp/serpapi_search', async (req, res) => {
     
     // Log request
     console.log(`SerpAPI search: ${query}`);
+    console.log(`Using SerpAPI key: ${SERPAPI_KEY.substring(0, 5)}...`);
     
     // Mock response for now (would be actual API call)
     const mockResponse = {
@@ -104,6 +105,7 @@ app.post('/api/mcp/search1_query', async (req, res) => {
     
     // Log request
     console.log(`Search1API query: ${q}`);
+    console.log(`Using Search1API key: ${SEARCH1_KEY.substring(0, 5)}...`);
     
     // Mock response for now
     const mockResponse = {
@@ -165,6 +167,7 @@ app.post('/api/mcp/perplexity_search', async (req, res) => {
     
     // Log request
     console.log(`Perplexity search: ${query}`);
+    console.log(`Using Perplexity key: ${PERPLEXITY_KEY.substring(0, 5)}...`);
     
     // Mock response for now
     const mockResponse = {
