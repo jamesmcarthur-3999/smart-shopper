@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
 interface Product {
@@ -12,12 +12,142 @@ interface Product {
   reviews_count?: number;
 }
 
+interface EnrichmentItem {
+  topic: string;
+  content: string;
+  sources?: string[];
+}
+
+interface GridLayout {
+  columns: number;
+  rows?: number;
+  gap?: string;
+  itemWidth?: string;
+  itemHeight?: string;
+}
+
+// Canvas Operations Interfaces
+interface AddCardOperation {
+  op: 'add_card';
+  id: string;
+  title: string; 
+  price: string;
+  img_url?: string;
+  source: string;
+  link?: string;
+  rating?: number;
+  reviews_count?: number;
+  description?: string;
+  metadata?: Record<string, any>;
+}
+
+interface UpdateGridOperation {
+  op: 'update_grid';
+  items: string[]; // Array of product card IDs to display
+  layout?: GridLayout;
+}
+
+interface HighlightChoiceOperation {
+  op: 'highlight_choice';
+  id: string;
+  reason?: string;
+}
+
+interface UndoLastOperation {
+  op: 'undo_last';
+  n?: number;
+}
+
+type CanvasOperation = 
+  | AddCardOperation
+  | UpdateGridOperation
+  | HighlightChoiceOperation
+  | UndoLastOperation;
+
 const App: React.FC = () => {
   const [query, setQuery] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [enrichment, setEnrichment] = useState<any>(null);
+  const [enrichment, setEnrichment] = useState<EnrichmentItem[]>([]);
+  const [highlightedProductId, setHighlightedProductId] = useState<string | null>(null);
+  const [highlightReason, setHighlightReason] = useState<string | null>(null);
+  const [gridLayout, setGridLayout] = useState<GridLayout>({ columns: 3 });
+  const [displayedProductIds, setDisplayedProductIds] = useState<string[]>([]);
+  const [operationHistory, setOperationHistory] = useState<CanvasOperation[]>([]);
+
+  // Handle canvas operations
+  const processCanvasOperation = useCallback((operation: CanvasOperation) => {
+    // Add operation to history for undo capability
+    setOperationHistory(prev => [...prev, operation]);
+    
+    switch (operation.op) {
+      case 'add_card':
+        // Check if product already exists, update it if it does
+        setProducts(prev => {
+          const existingIndex = prev.findIndex(p => p.id === operation.id);
+          if (existingIndex >= 0) {
+            const updated = [...prev];
+            updated[existingIndex] = {
+              id: operation.id,
+              title: operation.title,
+              price: operation.price,
+              img_url: operation.img_url,
+              source: operation.source,
+              link: operation.link,
+              rating: operation.rating,
+              reviews_count: operation.reviews_count
+            };
+            return updated;
+          } else {
+            // Add new product
+            return [...prev, {
+              id: operation.id,
+              title: operation.title,
+              price: operation.price,
+              img_url: operation.img_url,
+              source: operation.source,
+              link: operation.link,
+              rating: operation.rating,
+              reviews_count: operation.reviews_count
+            }];
+          }
+        });
+        break;
+        
+      case 'update_grid':
+        // Update displayed product IDs
+        setDisplayedProductIds(operation.items);
+        
+        // Update grid layout if provided
+        if (operation.layout) {
+          setGridLayout(operation.layout);
+        }
+        break;
+        
+      case 'highlight_choice':
+        // Highlight a product
+        setHighlightedProductId(operation.id);
+        setHighlightReason(operation.reason || null);
+        break;
+        
+      case 'undo_last':
+        // Undo the last n operations
+        const n = operation.n || 1;
+        setOperationHistory(prev => {
+          const newHistory = [...prev];
+          newHistory.splice(-n); // Remove the last n operations (including this undo op)
+          return newHistory;
+        });
+        // TODO: Implement actual state reversal based on operation history
+        break;
+    }
+  }, []);
+
+  // Filtered products based on displayed IDs
+  const filteredProducts = displayedProductIds.length > 0
+    ? products.filter(p => displayedProductIds.includes(p.id))
+    : products;
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,8 +156,13 @@ const App: React.FC = () => {
     
     setLoading(true);
     setError(null);
+    setProducts([]);
+    setEnrichment([]);
+    setHighlightedProductId(null);
+    setHighlightReason(null);
     
     try {
+      console.log('Searching for:', query);
       // Call the multi-source MCP tool
       const response = await axios.post('/api/mcp/multi_source_search', {
         query,
@@ -36,8 +171,12 @@ const App: React.FC = () => {
         sort_by: 'relevance'
       });
       
+      console.log('Search response:', response.data);
+      
       if (response.data.results) {
         setProducts(response.data.results);
+        // By default, display all products
+        setDisplayedProductIds(response.data.results.map((p: Product) => p.id));
       }
       
       if (response.data.enrichment) {
@@ -50,6 +189,9 @@ const App: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // Dynamic grid columns based on layout
+  const gridClass = `grid-cols-1 md:grid-cols-${Math.min(gridLayout.columns, 2)} lg:grid-cols-${gridLayout.columns}`;
 
   return (
     <div className="container mx-auto p-4">
@@ -82,10 +224,10 @@ const App: React.FC = () => {
       )}
       
       {/* Product Enrichment Section */}
-      {enrichment && (
+      {enrichment && enrichment.length > 0 && (
         <div className="mb-6 p-4 border border-blue-200 bg-blue-50 rounded-lg">
           <h2 className="text-lg font-semibold mb-2">Product Insights</h2>
-          {enrichment.map((item: any, index: number) => (
+          {enrichment.map((item, index) => (
             <div key={`enrichment-${index}`} className="mb-3">
               <h3 className="font-medium">{item.topic}</h3>
               <p className="text-sm">{item.content}</p>
@@ -100,12 +242,21 @@ const App: React.FC = () => {
       )}
       
       {/* Product Grid */}
-      <div className="product-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {products.map(product => (
+      <div className={`product-grid grid ${gridClass} gap-6`}>
+        {filteredProducts.map(product => (
           <div
             key={product.id}
-            className="border border-gray-200 rounded-lg p-4 hover:shadow-lg transition-shadow"
+            className={`border rounded-lg p-4 hover:shadow-lg transition-shadow ${
+              highlightedProductId === product.id 
+                ? 'border-blue-500 ring-2 ring-blue-300 bg-blue-50' 
+                : 'border-gray-200'
+            }`}
           >
+            {highlightedProductId === product.id && highlightReason && (
+              <div className="bg-blue-100 text-blue-800 text-sm p-2 rounded mb-2">
+                {highlightReason}
+              </div>
+            )}
             <div className="h-40 bg-gray-100 flex items-center justify-center mb-4">
               {product.img_url ? (
                 <img
@@ -143,6 +294,7 @@ const App: React.FC = () => {
         ))}
       </div>
       
+      {/* Empty State */}
       {products.length === 0 && !loading && (
         <div className="text-center text-gray-500 mt-12">
           <p>Search for products to see results here</p>
