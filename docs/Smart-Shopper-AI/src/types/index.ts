@@ -1,162 +1,340 @@
 /**
- * Smart Shopper AI - Core Types
- * 
- * This file contains the core TypeScript type definitions used across the application.
+ * Type definitions for Smart Shopper AI
  */
 
+// Product and Search Types
+
 /**
- * Product model representing a shopping item
+ * Product data structure
  */
 export interface Product {
+  /** Unique identifier */
   id: string;
+  
+  /** Product title */
   title: string;
+  
+  /** Formatted price (e.g. "$19.99") */
   price: string;
+  
+  /** Original price before discount (if any) */
   originalPrice?: string;
-  discount?: string;
+  
+  /** Currency symbol */
   currency?: string;
+  
+  /** Product description */
   description?: string;
+  
+  /** Brand or manufacturer */
   brand?: string;
-  category?: string;
-  images: string[];
-  thumbnail: string;
-  link: string;
+  
+  /** Array of image URLs */
+  images?: string[];
+  
+  /** Thumbnail image URL */
+  thumbnail?: string;
+  
+  /** Product URL */
+  link?: string;
+  
+  /** Rating (0-5) */
   rating?: number;
+  
+  /** Number of reviews */
   reviewCount?: number;
+  
+  /** Whether the product is in stock */
   inStock?: boolean;
+  
+  /** Shipping information */
   shipping?: string;
+  
+  /** Seller or store name */
   seller?: string;
+  
+  /** Data source identifier */
   source: string;
+  
+  /** Source-specific ID */
   sourceId: string;
-  attributes?: Record<string, string | number | boolean>;
+  
+  /** Additional attributes */
+  attributes?: Record<string, any>;
+  
+  /** Timestamp of retrieval */
   timestamp: number;
 }
 
 /**
- * Search filters for product queries
+ * Facet value with count
  */
-export interface SearchFilters {
-  price?: string;
-  minPrice?: number;
-  maxPrice?: number;
-  brand?: string | string[];
-  category?: string | string[];
-  rating?: number;
-  inStock?: boolean;
-  freeShipping?: boolean;
-  discount?: boolean;
-  [key: string]: any;
+export interface Facet {
+  /** Facet value */
+  value: string | number | boolean;
+  
+  /** Count of items with this facet value */
+  count: number;
+  
+  /** Display label */
+  label: string;
 }
 
 /**
- * Search facets for product queries
- */
-export type SearchFacets = string[];
-
-/**
- * Boost parameters for search relevance
- */
-export interface BoostParams {
-  field: string;
-  factor: number;
-}
-
-/**
- * Pagination parameters for search queries
- */
-export interface PaginationParams {
-  cursor?: string;
-  limit?: number;
-  page?: number;
-}
-
-/**
- * Base search query parameters
- */
-export interface SearchQueryParams {
-  q: string;
-  filters?: SearchFilters;
-  facets?: SearchFacets;
-  boost?: BoostParams;
-  pagination?: PaginationParams;
-}
-
-/**
- * Search results including products and metadata
+ * Search results from a single source
  */
 export interface SearchResults {
+  /** Array of product results */
   products: Product[];
+  
+  /** Total count of matching products */
   totalCount: number;
-  facets?: Record<string, any>;
-  nextCursor?: string;
+  
+  /** Facets for filtering */
+  facets?: Record<string, Facet[]>;
+  
+  /** Data source identifier */
   source: string;
+  
+  /** Search latency in milliseconds */
   latency: number;
+  
+  /** Pagination cursor */
+  cursor?: string;
+  
+  /** Timestamp of search */
   timestamp: number;
 }
 
 /**
- * SerpAPI specific search parameters
+ * Search parameters for SerpAPI
  */
-export interface SerpApiParams extends SearchQueryParams {
+export interface SerpApiParams {
+  /** Search query */
+  q: string;
+  
+  /** Fields to return */
   fields?: string;
+  
+  /** Skip cache */
   no_cache?: boolean;
+  
+  /** Filters to apply */
+  filters?: Record<string, any>;
 }
 
 /**
- * Search1API specific search parameters
+ * Search parameters for Search1API
  */
-export interface Search1ApiParams extends SearchQueryParams {
-  // Add any Search1API-specific parameters here
-}
-
-/**
- * Perplexity specific search parameters
- */
-export interface PerplexityParams {
-  query: string;
-  model?: string;
-  context_size?: string;
-  domain_filter?: string[];
-  include_domains?: boolean;
-}
-
-/**
- * Product enrichment information from Perplexity
- */
-export interface ProductEnrichment {
-  productId: string;
-  insights: string;
-  prosAndCons: {
-    pros: string[];
-    cons: string[];
+export interface Search1Params {
+  /** Search query */
+  q: string;
+  
+  /** Filters to apply */
+  filters?: Record<string, any>;
+  
+  /** Facets to return */
+  facets?: string[];
+  
+  /** Boost parameters */
+  boost?: {
+    field: string;
+    factor: number;
   };
-  comparisons?: {
-    productId: string;
-    title: string;
-    advantages: string[];
-    disadvantages: string[];
-  }[];
-  citations: {
-    url: string;
-    title: string;
-  }[];
-}
-
-/**
- * Error response format
- */
-export interface ErrorResponse {
-  code: string;
-  message: string;
-  details?: any;
-  retryable: boolean;
-}
-
-/**
- * Multi-source search parameters
- */
-export interface MultiSourceParams {
-  query: string;
-  sources?: string[];
-  filters?: SearchFilters;
+  
+  /** Pagination cursor */
+  cursor?: string;
+  
+  /** Results limit */
   limit?: number;
+}
+
+// Enrichment Types
+
+/**
+ * Citation information
+ */
+export interface Citation {
+  /** Citation ID */
+  id: string;
+  
+  /** Source title */
+  title: string;
+  
+  /** Source URL */
+  url: string;
+  
+  /** Text snippet */
+  snippet?: string;
+  
+  /** Source domain */
+  domain: string;
+  
+  /** Timestamp of retrieval */
+  timestamp: number;
+}
+
+/**
+ * Enrichment result
+ */
+export interface EnrichmentResult {
+  /** Enrichment content */
+  content: string;
+  
+  /** Citations */
+  citations: Citation[];
+  
+  /** Model used */
+  model: string;
+  
+  /** Latency in milliseconds */
+  latency: number;
+  
+  /** Timestamp of enrichment */
+  timestamp: number;
+  
+  /** Error information if any */
+  error?: {
+    message: string;
+    code: string;
+    source: string;
+  };
+}
+
+// Multi-Source Search Types
+
+/**
+ * Product search result from a single source
+ */
+export interface ProductSearchResult {
+  /** Product results */
+  products: any[];
+  
+  /** Total count */
+  totalCount: number;
+  
+  /** Facets if available */
+  facets?: Record<string, Facet[]>;
+  
+  /** Source identifier */
+  source: string;
+  
+  /** Source display name */
+  sourceDisplayName?: string;
+  
+  /** Search latency */
+  latency: number;
+  
+  /** Pagination cursor */
+  cursor?: string;
+  
+  /** Error information if any */
+  error?: {
+    message: string;
+    code: string;
+    source: string;
+  };
+}
+
+/**
+ * Source metadata in multi-source results
+ */
+export interface SourceInfo {
+  /** Source identifier */
+  id: string;
+  
+  /** Source display name */
+  name: string;
+  
+  /** Count of results from this source */
+  count: number;
+  
+  /** Source latency */
+  latency: number;
+  
+  /** Error information if any */
+  error?: {
+    message: string;
+    code: string;
+    source: string;
+  };
+}
+
+/**
+ * Combined multi-source search result
+ */
+export interface MultiSourceSearchResult {
+  /** Merged product results */
+  products: any[];
+  
+  /** Total count */
+  totalCount: number;
+  
+  /** Source information */
+  sources: SourceInfo[];
+  
+  /** Enrichment data if available */
+  enrichment?: EnrichmentResult | null;
+  
+  /** Overall latency */
+  latency: number;
+  
+  /** Timestamp */
+  timestamp: number;
+}
+
+/**
+ * Source definition interface
+ */
+export interface Source {
+  /** Source identifier */
+  id: string;
+  
+  /** Source display name */
+  name: string;
+  
+  /** Priority (lower is higher priority) */
+  priority: number;
+  
+  /** Search function */
+  search?: (query: string, options?: any) => Promise<ProductSearchResult>;
+  
+  /** Enrichment function */
+  enrich?: (query: string, options?: any) => Promise<EnrichmentResult>;
+  
+  /** Product enhancement function */
+  enhanceProducts?: (products: any[], enrichment: EnrichmentResult) => any[];
+}
+
+// Canvas Operation Types
+
+/**
+ * Canvas operation error
+ */
+export interface CanvasOpError {
+  /** Error code */
+  code: string;
+  
+  /** Error message */
+  message: string;
+  
+  /** Operation ID that failed */
+  opId: string;
+}
+
+/**
+ * Canvas operation result
+ */
+export interface CanvasOpResult {
+  /** Success flag */
+  success: boolean;
+  
+  /** Operation ID */
+  opId: string;
+  
+  /** Error information if failed */
+  error?: CanvasOpError;
+  
+  /** Result data if any */
+  data?: any;
 }
