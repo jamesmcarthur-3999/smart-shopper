@@ -1,0 +1,104 @@
+name: Feature Request
+description: Request a new feature for Smart Shopper
+title: "[FEATURE]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this feature request!
+        
+        Please follow the structured format below to ensure Claude can properly process this request.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Feature Description
+      description: Clearly describe the feature you'd like to see in Smart Shopper.
+      placeholder: As a user, I want to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: plan
+    attributes:
+      label: "### PLAN"
+      description: Outline the steps to implement this feature.
+      placeholder: |
+        1. Analyze user request to extract key parameters
+        2. Call SerpAPI to fetch initial product data
+        3. Enrich results with Perplexity
+        4. Render comparison table on canvas
+    validations:
+      required: true
+
+  - type: textarea
+    id: tools
+    attributes:
+      label: MCP Tools Required
+      description: List the MCP tools that will be needed for this feature.
+      placeholder: |
+        - serpapi_search: For fetching product listings
+        - perplexity_search: For enriching product data
+        - update_grid: For rendering comparison view
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: Define what needs to be true for this feature to be considered complete.
+      placeholder: |
+        - [ ] Feature responds within 1s latency target
+        - [ ] Uses only approved MCP tools
+        - [ ] Handles error cases gracefully
+        - [ ] Works on all device sizes per wireframes
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this feature?
+      options:
+        - Critical (blocking user success)
+        - High (significant improvement)
+        - Medium (valuable enhancement)
+        - Low (nice to have)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: performance
+    attributes:
+      label: Expected Performance Impact
+      description: How will this feature affect the performance budget?
+      options:
+        - Improves performance
+        - Neutral impact
+        - Minor impact (still within budget)
+        - Significant impact (requires optimization)
+    validations:
+      required: true
+
+  - type: textarea
+    id: wireframes
+    attributes:
+      label: UI Changes Required
+      description: Describe any changes needed to the User Interface.
+      placeholder: The feature requires adding a new filter panel to the canvas with these controls...
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ## For Claude Processing
+        
+        Claude will evaluate this feature request by:
+        1. Following the PLAN → tool_use → PATCH → REFLECT workflow
+        2. Using exclusively MCP tools (no raw REST or shell)
+        3. Ensuring all operations respect the 1-second latency target
+        4. Checking schema compatibility with `/docs/tool_schemas.json`
