@@ -1,0 +1,77 @@
+# Smart Shopper - Source Registry Configuration
+# 
+# This file defines the available product data sources and their default parameters.
+# Each source is mapped to an MCP tool and includes default settings.
+
+sources:
+  - id: serpapi
+    name: "Google Shopping"
+    tool: serpapi_search
+    description: "Fetches product results from Google Shopping via SerpAPI"
+    priority: 1
+    defaultParams:
+      num_results: 5
+      fields: "shopping_results.price,title,thumbnail,link,source,reviews,rating"
+      no_cache: false
+    rateLimit:
+      maxRequests: 10
+      perMinutes: 1
+    errorRetry:
+      maxAttempts: 3
+      initialDelayMs: 500
+      backoffFactor: 2
+
+  - id: search1
+    name: "Smart Shopper Index"
+    tool: search1_query
+    description: "Queries the elastic product index for rich product data"
+    priority: 2
+    defaultParams:
+      limit: 10
+      facets: ["brand", "category", "price_range", "rating"]
+      boost: 
+        field: "rating"
+        factor: 1.2
+    rateLimit:
+      maxRequests: 20
+      perMinutes: 1
+    errorRetry:
+      maxAttempts: 2
+      initialDelayMs: 300
+      backoffFactor: 1.5
+
+  - id: perplexity
+    name: "Product Enrichment"
+    tool: perplexity_search
+    description: "Enriches product data with citations and additional information"
+    priority: 3
+    defaultParams:
+      model: "sonar-small-online"
+      context_size: "medium"
+      no_cache: false
+    rateLimit:
+      maxRequests: 5
+      perMinutes: 1
+    errorRetry:
+      maxAttempts: 2
+      initialDelayMs: 1000
+      backoffFactor: 2
+
+# Configuration for the multi-source search tool
+multi_source:
+  # Default behavior for parallel requests
+  parallel: true
+  # Maximum number of parallel requests
+  maxParallel: 3
+  # Default timeout in milliseconds
+  timeoutMs: 800
+  # Fallback strategy (continue with available results if a source times out)
+  fallbackOnTimeout: true
+  # Default sources to use (by ID)
+  defaultSources: ["serpapi", "search1"]
+  # Merge strategy options
+  mergeStrategy: "interleave"
+  # Default number of results to return per source
+  resultsPerSource: 3
+  # Maximum total results to return
+  maxResults: 10
