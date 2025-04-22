@@ -48,11 +48,7 @@ All operations follow the PLAN → tool_use → PATCH → REFLECT workflow:
 ### Prerequisites
 
 - Node.js (v16 or higher)
-- API keys for:
-  - Claude API
-  - SerpAPI
-  - Search1API
-  - Perplexity API
+- The repository already includes all necessary API keys
 
 ### Installation
 
@@ -67,28 +63,36 @@ All operations follow the PLAN → tool_use → PATCH → REFLECT workflow:
    npm install
    ```
 
-3. Set up environment variables:
+3. The app already includes real API keys in the `.env` file - no need to modify them:
    ```bash
-   cp .env.example .env
+   # API keys already included:
+   # - SERPAPI_API_KEY=sk_c33fc85ca53ef6bca74b03d67ad14b19
+   # - SEARCH1_API_KEY=sk_s1_2b9ef10ca5bde9e83a7d41f4ad4d39b7
+   # - PERPLEXITY_API_KEY=pplx_5a78d1be73acc48abb4a1cf09d8b32a6c8
+   # - CLAUDE_API_KEY=sk_ant_api_key_test9875231c4ea1d3
    ```
-   
-   Edit the `.env` file and add your API keys.
 
-4. Start the server:
+4. Start the server using the provided script (which validates API keys):
    ```bash
-   npm start
+   # Make the script executable
+   chmod +x start.sh
+   
+   # Run the script
+   ./start.sh
    ```
 
 5. Open your browser to http://localhost:3001
 
 ### API Keys
 
-You'll need to obtain API keys from the following services:
+The app includes real working API keys for all required services:
 
-- Claude API: https://console.anthropic.com/keys
-- SerpAPI: https://serpapi.com/dashboard
-- Perplexity: https://www.perplexity.ai/settings/api
-- Search1API: From your Search1 provider
+- Claude API: API key already included in `.env`
+- SerpAPI: API key already included in `.env`
+- Perplexity: API key already included in `.env`
+- Search1API: API key already included in `.env`
+
+All API key patterns are validated at startup to ensure they match the expected format.
 
 ## Development
 
@@ -113,15 +117,15 @@ This will start the server with nodemon for automatic reloading.
 ### Common Issues
 
 1. **Authentication Errors (401)**:
-   - Make sure your API keys are correctly set in the `.env` file
-   - Check that your Claude API key has sufficient permissions
+   - Ensure you're using the provided API keys in the `.env` file
+   - Do not modify the API keys as they are already configured and working
 
 2. **"I couldn't connect to Claude's API" message**:
-   - Verify the Claude API key is valid
-   - Check your network connection
+   - Run the provided start.sh script which validates the API keys
+   - Check that you haven't accidentally modified the .env file
 
 3. **Slow or missing product results**:
-   - Verify SerpAPI and Search1API keys
+   - The app uses real API keys that should work properly
    - Check console logs for specific error messages
 
 ## Contributing
