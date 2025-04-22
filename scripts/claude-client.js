@@ -6,6 +6,7 @@
  */
 
 const axios = require('axios');
+const util = require('util');
 
 class ClaudeClient {
   /**
@@ -21,6 +22,9 @@ class ClaudeClient {
     this.maxTokens = config.maxTokens || 1024;
     this.model = config.model || 'claude-3-sonnet-20240229';
     this.apiEndpoint = 'https://api.anthropic.com/v1/messages';
+    
+    // Debug logging for API key
+    console.log(`Claude API key initialized: ${this.apiKey ? (this.apiKey.substring(0, 5) + '...' + this.apiKey.substring(this.apiKey.length - 3)) : 'MISSING'}`);
   }
 
   /**
@@ -41,15 +45,34 @@ class ClaudeClient {
 Your task is to help the user find the best products based on their query: "${query}".
 Analyze the provided products and enrichment data to provide insights, recommendations, and canvas operations.
 
+Follow this workflow:
+1. PLAN - Analyze the products and determine the best approach
+2. REFLECT - Provide insights about the products, including patterns, price ranges, and quality assessment
+3. PATCH - Provide canvas operations to organize and highlight the most relevant products
+
 Your response must be in JSON format with these sections:
-- insights: Array of analysis points about the products
-- canvas_operations: Array of operations to modify the product display
+- insights: Array of analysis points about the products (1-3 key observations)
+- canvas_operations: Array of operations to modify the product display including:
+  - update_grid: to organize products (include only the most relevant products)
+  - highlight_choice: to emphasize your top recommendation(s) with a reason
 `;
 
     // Create a structured message with product data
     const userMessage = this._formatProductData(query, products, enrichment, context);
 
     try {
+      console.log(`Making Claude API request for query: "${query}" with ${products?.length || 0} products`);
+      
+      // Log request details in development
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Claude request payload:', {
+          model: this.model,
+          max_tokens: this.maxTokens,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userMessage.substring(0, 100) + '...' }]
+        });
+      }
+
       // Make API call to Claude
       const response = await axios.post(
         this.apiEndpoint,
@@ -68,30 +91,63 @@ Your response must be in JSON format with these sections:
             'x-api-key': this.apiKey,
             'anthropic-version': '2023-06-01'
           },
-          timeout: 10000 // 10-second timeout
+          timeout: 30000 // 30-second timeout
         }
       );
+
+      console.log('Claude API response status:', response.status);
+      
+      // Debug response structure in development
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Claude API response structure:', util.inspect(response.data, { depth: 3, colors: true }));
+      }
 
       // Parse the JSON response content
       let jsonResponse;
       try {
-        jsonResponse = JSON.parse(response.data.content[0].text);
+        // Extract the content from the response
+        const content = response.data.content[0].text;
+        jsonResponse = JSON.parse(content);
+        
+        console.log('Successfully parsed Claude response as JSON');
       } catch (parseError) {
         console.error('Error parsing Claude response as JSON:', parseError);
+        console.error('Raw response content:', response.data?.content);
+        
+        // Provide a fallback response
         jsonResponse = {
           insights: [
             {
               type: 'error',
-              content: 'Failed to parse Claude response as JSON.'
+              content: 'I had trouble processing these products in a structured way. Let me describe what I found instead.'
+            },
+            {
+              type: 'summary',
+              content: `I found ${products?.length || 0} products related to "${query}". The prices range from ${this._getPriceRange(products)}.`
             }
           ],
-          canvas_operations: []
+          canvas_operations: [
+            {
+              op: 'update_grid',
+              items: products?.map(p => p.id) || [],
+              layout: { columns: 3 }
+            }
+          ]
         };
       }
 
       return jsonResponse;
     } catch (error) {
-      console.error('Error calling Claude API:', error);
+      console.error('Error calling Claude API:', error.message);
+      
+      // Log more detailed error information
+      if (error.response) {
+        console.error('Claude API error response data:', error.response.data);
+        console.error('Claude API error response status:', error.response.status);
+        console.error('Claude API error response headers:', error.response.headers);
+      } else if (error.request) {
+        console.error('Claude API error request:', error.request);
+      }
       
       // Return a fallback response
       return {
@@ -99,10 +155,20 @@ Your response must be in JSON format with these sections:
         insights: [
           {
             type: 'error',
-            content: `Error communicating with Claude: ${error.message}`
+            content: `I encountered an error while analyzing these products (${error.message}). Let me share what I can based on the raw data.`
+          },
+          {
+            type: 'summary',
+            content: `I found ${products?.length || 0} products related to "${query}". ${this._getFallbackInsight(products)}`
           }
         ],
-        canvas_operations: []
+        canvas_operations: [
+          {
+            op: 'update_grid',
+            items: products?.map(p => p.id) || [],
+            layout: { columns: 3 }
+          }
+        ]
       };
     }
   }
@@ -129,10 +195,11 @@ Your response must be in JSON format with these sections:
         message += `- ID: ${product.id}\n`;
         message += `- Title: ${product.title}\n`;
         message += `- Price: ${product.price}\n`;
-        message += `- Source: ${product.source}\n`;
+        message += `- Source: ${product.source || 'Unknown'}\n`;
         
         if (product.rating) message += `- Rating: ${product.rating}\n`;
         if (product.reviews_count) message += `- Reviews: ${product.reviews_count}\n`;
+        if (product.description) message += `- Description: ${product.description}\n`;
         
         message += '\n';
       });
@@ -146,6 +213,14 @@ Your response must be in JSON format with these sections:
       enrichment.forEach(item => {
         message += `${item.topic || 'Information'}:\n`;
         message += `${item.content}\n\n`;
+        
+        if (item.sources && item.sources.length > 0) {
+          message += 'Sources:\n';
+          item.sources.forEach(source => {
+            message += `- ${source.title || source.url || 'Unknown source'}\n`;
+          });
+          message += '\n';
+        }
       });
     } else {
       message += 'No enrichment data available.\n\n';
@@ -166,13 +241,83 @@ Your response must be in JSON format with these sections:
     
     // Instructions for the response format
     message += `\n### Response Instructions
-Please analyze these products and provide:
+Analyze these products and provide:
 1. Insights about the products, including patterns, price analysis, and quality assessment
 2. Canvas operations to organize and highlight the most relevant products
 
 Return your analysis as a JSON object with 'insights' and 'canvas_operations' arrays.`;
 
     return message;
+  }
+
+  /**
+   * Get price range from products
+   * 
+   * @private
+   * @param {Array} products Product list
+   * @returns {string} Price range string
+   */
+  _getPriceRange(products) {
+    if (!products || products.length === 0) {
+      return 'unknown';
+    }
+    
+    const prices = products
+      .map(p => parseFloat(p.price?.replace(/[^0-9.]/g, '')))
+      .filter(price => !isNaN(price));
+      
+    if (prices.length === 0) {
+      return 'unknown';
+    }
+    
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+    
+    return `$${minPrice.toFixed(2)} to $${maxPrice.toFixed(2)}`;
+  }
+
+  /**
+   * Get fallback insight for products
+   * 
+   * @private
+   * @param {Array} products Product list
+   * @returns {string} Fallback insight
+   */
+  _getFallbackInsight(products) {
+    if (!products || products.length === 0) {
+      return 'No product details available.';
+    }
+    
+    // Get most common source
+    const sources = {};
+    products.forEach(p => {
+      if (p.source) {
+        sources[p.source] = (sources[p.source] || 0) + 1;
+      }
+    });
+    
+    let topSource = 'various sources';
+    let topCount = 0;
+    
+    Object.entries(sources).forEach(([source, count]) => {
+      if (count > topCount) {
+        topSource = source;
+        topCount = count;
+      }
+    });
+    
+    // Get average rating if available
+    const ratings = products
+      .map(p => parseFloat(p.rating))
+      .filter(rating => !isNaN(rating));
+      
+    let ratingInfo = '';
+    if (ratings.length > 0) {
+      const avgRating = ratings.reduce((sum, r) => sum + r, 0) / ratings.length;
+      ratingInfo = ` The average rating is ${avgRating.toFixed(1)}/5.`;
+    }
+    
+    return `Most products are from ${topSource}.${ratingInfo}`;
   }
 }
 
