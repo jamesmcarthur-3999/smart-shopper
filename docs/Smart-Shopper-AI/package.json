@@ -11,11 +11,13 @@
     "start:search1api": "node dist/mcp-servers/search1api/index.js",
     "start:perplexity": "node dist/mcp-servers/perplexity/index.js",
     "start:multi": "node dist/mcp-servers/multi-source/index.js",
+    "start:canvas": "node dist/mcp-servers/canvas/index.js",
     "dev": "ts-node src/index.ts",
     "dev:serpapi": "ts-node src/mcp-servers/serpapi/index.ts",
     "dev:search1api": "ts-node src/mcp-servers/search1api/index.ts",
     "dev:perplexity": "ts-node src/mcp-servers/perplexity/index.ts",
     "dev:multi": "ts-node src/mcp-servers/multi-source/index.ts",
+    "dev:canvas": "ts-node src/mcp-servers/canvas/index.ts",
     "test": "jest",
     "lint": "eslint . --ext .ts",
     "format": "prettier --write \"src/**/*.ts\""
