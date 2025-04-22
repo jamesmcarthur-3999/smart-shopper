@@ -38,23 +38,35 @@ Smart Shopper transforms a chat interface into an AI-powered shopping concierge 
    - 📄 `/docs/mcp_quick_guide.md` - Understanding MCP tools
    - 📄 `/docs/Smart-Shopper-AI/` - Reference implementation
 
-2. **Launch MCP Servers**:
+2. **Launch MCP Servers with Claude Desktop**:
    ```bash
-   # Start all MCP servers
-   cd docs/Smart-Shopper-AI
-   npm install
-   npm start
+   # First make sure your .env file contains all the required API keys
+   node launch.js
    ```
+
+   This launcher script will:
+   - Build the MCP servers
+   - Configure Claude Desktop
+   - Launch Claude Desktop with MCP server connections
 
 3. **Configure Environment**:
    - Copy `.env.example` to `.env`
-   - Add API keys for SerpAPI, Search1API, and Perplexity
+   - Add API keys for SerpAPI, Search1API, Perplexity, and Claude
 
-4. **Start Frontend**:
-   ```bash
-   npm install
-   npm run dev
-   ```
+## Proper MCP Implementation
+
+Smart Shopper uses real MCP connections, not simulated ones. This means:
+
+1. Claude directly connects to MCP servers that expose specific tools:
+   - `serpapi_search`: Search Google Shopping for products
+   - `search1_query`: Search product database with filters
+   - `perplexity_search`: Enrich product data with context
+   - `multi_source_search`: Combine results from multiple sources
+   - `add_card`, `update_grid`, `highlight_choice`, `undo_last`: Canvas operations
+
+2. MCP servers are standalone processes that Claude communicates with via the MCP protocol
+
+3. The PLAN → tool_use → PATCH → REFLECT workflow is natural to Claude, not simulated in UI
 
 ## MCP Tool Workflow
 
@@ -86,15 +98,10 @@ Smart Shopper transforms a chat interface into an AI-powered shopping concierge 
 | `search1_query` | Product database search | `/mcp-servers/search1api/` |
 | `perplexity_search` | Context enrichment | `/mcp-servers/perplexity/` |
 | `multi_source_search` | Combined search | `/mcp-servers/multi-source/` |
-
-## Canvas Operations
-
-| Operation | Purpose | Parameters |
-|-----------|---------|------------|
-| `add_card` | Add/update product | `id`, `title`, `price`, `img_url`, `source` |
-| `update_grid` | Change layout | `items[]`, `layout` |
-| `highlight_choice` | Mark recommendation | `id`, `reason` |
-| `undo_last` | Revert operation | `n` |
+| `add_card` | Add/update product card | `/mcp-servers/canvas/` |
+| `update_grid` | Change grid layout | `/mcp-servers/canvas/` |
+| `highlight_choice` | Mark recommendation | `/mcp-servers/canvas/` |
+| `undo_last` | Revert operation | `/mcp-servers/canvas/` |
 
 ## Contributing
 
