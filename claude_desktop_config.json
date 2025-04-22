@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "serpapi": {
+      "command": "npm",
+      "args": ["run", "start:serpapi"],
+      "cwd": "./docs/Smart-Shopper-AI"
+    },
+    "search1api": {
+      "command": "npm",
+      "args": ["run", "start:search1api"],
+      "cwd": "./docs/Smart-Shopper-AI"
+    },
+    "perplexity": {
+      "command": "npm",
+      "args": ["run", "start:perplexity"],
+      "cwd": "./docs/Smart-Shopper-AI"
+    },
+    "multi_source": {
+      "command": "npm",
+      "args": ["run", "start:multi"],
+      "cwd": "./docs/Smart-Shopper-AI"
+    }
+  }
+}
