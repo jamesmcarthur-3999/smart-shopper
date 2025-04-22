@@ -1,126 +1,172 @@
-# MCP Quick-Guide for Claude (Smart Shopper App Tools)
+# MCP Quick-Guide for Smart Shopper (Claude-Powered Shopping App)
 
-This quick-guide ensures Claude clearly understands how to correctly use the Smart Shopper-specific **MCP (Model Context Protocol)** tools powered by the provided API keys. 
-
----
-
-## 📚 What Are MCP Tools?
-In the Smart Shopper context, MCP tools are custom servers built specifically to access external APIs (SerpAPI, Perplexity, Search1API) securely and efficiently. Claude interacts exclusively via these MCP servers, using provided API keys directly.
+This quick-guide explains how Smart Shopper implements **MCP (Model Context Protocol)** to enable Claude AI to connect with our product search tools.
 
 ---
 
-## 🌐 Why MCP for Smart Shopper?
-- **Real-Time Data**: Always current results; no mock data or placeholders.
-- **Secure API Access**: API keys safely stored in environment variables; usage directly permitted.
-- **Optimized Performance**: Allows parallel tool calls to meet latency targets (≤ 1 second).
+## 📚 What Is MCP and How Smart Shopper Uses It
+
+Model Context Protocol (MCP) is an open standard that lets AI models like Claude interact directly with external tools and data sources. In Smart Shopper:
+
+1. **Claude AI Is Central**: Claude functions as the core reasoning engine that:
+   - Plans the approach to a user's query
+   - Determines which tools to use
+   - Processes the results
+   - Makes product recommendations
+
+2. **MCP Tools Are Claude's Tools**: Our custom MCP servers provide Claude with:
+   - Product search capabilities (SerpAPI, Search1API)
+   - Enrichment data (Perplexity)
+   - Canvas manipulation operations
+
+3. **Visible Thought Process**: The user sees Claude's complete workflow:
+   - PLAN: Claude outlines its approach
+   - tool_use: Claude calls our MCP tools
+   - PATCH: Claude updates the canvas
+   - REFLECT: Claude evaluates and refines
 
 ---
 
-## 🔑 API Keys & Usage
-API keys are securely set via environment variables and can be used directly by Claude without additional approval:
-- `CLAUDE_API_KEY`
-- `SERPAPI_API_KEY`
-- `SEARCH1_API_KEY`
-- `PPLX_API_KEY`
+## 🌐 Smart Shopper's MCP Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     SMART SHOPPER APP                       │
+│                                                             │
+│  ┌───────────┐          ┌───────────────────────────────┐  │
+│  │           │          │                               │  │
+│  │  User     │◄─────────►        Claude AI Model        │  │
+│  │ Interface │          │  (Reasoning & Orchestration)  │  │
+│  │           │          │                               │  │
+│  └───────────┘          └─────────────┬─────────────────┘  │
+│                                        │                    │
+│                                        ▼                    │
+│  ┌────────────────────────────────────────────────────┐    │
+│  │                   MCP TOOLS                         │    │
+│  │                                                     │    │
+│  │  ┌──────────┐  ┌───────────┐  ┌──────────────┐     │    │
+│  │  │ SerpAPI  │  │ Search1   │  │ Perplexity   │     │    │
+│  │  │ Server   │  │ Server    │  │ Server       │     │    │
+│  │  └──────────┘  └───────────┘  └──────────────┘     │    │
+│  │                                                     │    │
+│  │  ┌──────────┐  ┌───────────┐  ┌──────────────┐     │    │
+│  │  │ add_card │  │update_grid│  │highlight_    │     │    │
+│  │  │ Tool     │  │Tool       │  │choice Tool   │     │    │
+│  │  └──────────┘  └───────────┘  └──────────────┘     │    │
+│  └────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+- Claude AI directly uses MCP tools to access external data sources
+- Each MCP server provides a specific capability to Claude
+- Claude demonstrates its thinking process in the user interface
 
 ---
 
-## ⚙️ MCP Tool Descriptions & Usage
+## 🔑 API Keys & Tool Usage
 
-### SerpAPI MCP Tool
-- **Purpose**: Fetch product results from Google Shopping
-- **Key Params**: `query`, `num_results`, `fields`
-- **Example Call**:
-```json
-{"method":"serpapi_search","params":{"query":"running shoes under $100","num_results":5,"fields":"price,title,img_url"}}
+All API keys are securely stored in environment variables:
+
+```
+SERPAPI_API_KEY=<key>
+SEARCH1_API_KEY=<key>
+PERPLEXITY_API_KEY=<key>
+CLAUDE_API_KEY=<key>
 ```
 
-### Perplexity MCP Tool
-- **Purpose**: Enrich product data and provide citations
-- **Key Params**: `query`, `model`, `context_size`
-- **Example Call**:
-```json
-{"method":"perplexity_search","params":{"query":"best running shoe materials","model":"sonar-small-online","context_size":"medium"}}
-```
+Claude directly accesses these keys through our MCP servers to make API calls. The workflow is:
 
-### Search1API MCP Tool
-- **Purpose**: Elastic search product indexing and querying
-- **Key Params**: `q`, `filters`, `facets`, `boost`
-- **Example Call**:
-```json
-{"method":"search1_query","params":{"q":"running shoes","filters":{"price":"<100"},"facets":["brand","size"],"boost":{"field":"rating","factor":1.2}}}
-```
+1. User asks a shopping question
+2. Claude determines which tools to use
+3. Claude calls the appropriate MCP tools
+4. MCP tools use API keys to fetch data
+5. Claude processes the results and updates the canvas
 
 ---
-## 🔄 Extending with New Sources
-To scale beyond SerpAPI, Perplexity, and Search1API, follow these patterns:
 
-### 1. Config-Driven Source Registry
-Maintain a registry (`/config/sources.json` or `/config/sources.yaml`) listing each source's MCP tool and default params:
-```yaml
-sources:
-  - id: serpapi
-    tool: serpapi_search
-    defaultParams:
-      num_results: 5
-      fields: price,title,img_url
-  - id: amazon
-    tool: amazon_search
-    defaultParams:
-      region: us
-  - id: ebay
-    tool: ebay_search
-    defaultParams:
-      buyingOptions:
-        - FIXED_PRICE
-```
-*When adding a new API, simply append a new entry.*
+## ⚙️ MCP Tool Descriptions 
 
-### 2. Adapter-Based Tool Structure
-On the MCP server side, organize each integration as an adapter module:
-```
-/adapters
-  ├── serpapi.js
-  ├── amazon.js
-  └── ebay.js
-```
-Each adapter exports a `search(query, opts)` function returning `Array<{id,title,price,url,thumbnail,source_id}>`. The MCP server's handler loads the registry, invokes `adapter.search(...)`, and normalizes responses.
+### 1. Product Search Tools
 
-### 3. Unified Multi-Source Tool
-Implement a `multi_source_search` MCP tool that:
-1. Reads the source registry
-2. Launches parallel adapter searches
-3. Merges and sorts results by relevance or price
-4. Returns a single unified list
-
-**Example Call**:
-```json
-{"method":"multi_source_search","params":{"query":"wedding shoes under $200"}}
+#### SerpAPI MCP Tool
+```javascript
+// Example of Claude using SerpAPI
+await serpapi_search({
+  query: "running shoes under $100", 
+  num_results: 5, 
+  fields: "price,title,img_url"
+});
 ```
 
-### 4. Fallback & Prioritization
-Within `multi_source_search`:
-- **Prioritize** sources by reliability or order defined in registry
-- **Fallback**: if a source fails, continue with others
-- **Rate-limit**: use token buckets per adapter
+#### Search1API MCP Tool
+```javascript
+// Example of Claude using Search1API 
+await search1_query({
+  q: "running shoes",
+  filters: {"price": "<100"},
+  facets: ["brand", "size"],
+  boost: {"field": "rating", "factor": 1.2}
+});
+```
 
-### 5. Adding Future Sources
-1. Create adapter (`/adapters/<source>.js`) implementing the `search` interface.
-2. Add entry to `/config/sources.json` with `id`, `tool`, and `defaultParams`.
-3. Restart the MCP server; Claude can immediately `tool_use` the new source by invoking `multi_source_search`.
+#### Perplexity MCP Tool
+```javascript
+// Example of Claude using Perplexity
+await perplexity_search({
+  query: "best running shoe materials", 
+  model: "sonar-small-online", 
+  context_size: "medium"
+});
+```
+
+### 2. Canvas Operation Tools
+
+```javascript
+// Example of Claude adding a product card
+await add_card({
+  id: "product123",
+  title: "Nike Air Zoom Pegasus",
+  price: "$95.99",
+  img_url: "https://example.com/shoe.jpg",
+  source: "SerpAPI"
+});
+
+// Example of Claude updating the grid
+await update_grid({
+  items: ["product123", "product456", "product789"],
+  layout: {columns: 3, gap: "1rem"}
+});
+
+// Example of Claude highlighting a recommendation
+await highlight_choice({
+  id: "product123",
+  reason: "Best combination of price and cushioning"
+});
+```
 
 ---
 
 ## 🛑 Common Pitfalls & Fixes
+
 | Pitfall | Fix |
 | ------- | --- |
-| Incorrect params or schemas | Verify params against `/docs/tool_schemas.json`. |
-| Placeholder/mock data used | Always execute live MCP calls with real API keys. |
-| Latency issues | Parallelize up to 3 calls; keep payload minimal. |
+| Not showing Claude's thinking | Ensure PLAN and REFLECT stages are visible in UI |
+| Slow response times | Use parallel tool calls (up to 3 at once) |
+| Missing product details | Check all MCP servers are running and accessible |
+| Poor recommendations | Give Claude enough context in its system prompt |
+| Security concerns | Never hardcode API keys; always use environment variables |
 
 ---
 
-### ✅ Success
-Claude confidently uses Smart Shopper MCP tools, real API keys, and adheres strictly to the project's latency and accuracy requirements, avoiding mock data or placeholders entirely.
+### ✅ Success Criteria
+
+Smart Shopper succeeds when:
+
+1. Claude's thinking process is transparent to users
+2. API calls are made through MCP tools, not direct REST
+3. The app provides helpful, relevant product recommendations
+4. The canvas displays rich, interactive product information
+5. Response times remain under 1 second (p95)
+6. API keys remain secure in environment variables
 
 _Last updated: 2025-04-21_
