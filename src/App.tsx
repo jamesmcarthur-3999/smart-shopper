@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 
+// Type definitions
 interface Product {
   id: string;
   title: string;
@@ -78,18 +79,59 @@ interface ClaudeAssistResponse {
   canvas_operations: CanvasOperation[];
 }
 
+// Message Types for Chat Interface
+type MessageType = 'user' | 'assistant' | 'plan' | 'tool' | 'reflect' | 'product-display';
+
+interface Message {
+  id: string;
+  type: MessageType;
+  content: string | React.ReactNode;
+  timestamp: Date;
+}
+
+interface ProductDisplayMessage extends Message {
+  type: 'product-display';
+  products: Product[];
+  highlightedProductId?: string;
+  highlightReason?: string;
+  gridLayout: GridLayout;
+}
+
 const App: React.FC = () => {
-  const [query, setQuery] = useState('');
+  // State for chat
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputValue, setInputValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // State for products and canvas
   const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [enrichment, setEnrichment] = useState<EnrichmentItem[]>([]);
   const [highlightedProductId, setHighlightedProductId] = useState<string | null>(null);
   const [highlightReason, setHighlightReason] = useState<string | null>(null);
   const [gridLayout, setGridLayout] = useState<GridLayout>({ columns: 3 });
   const [displayedProductIds, setDisplayedProductIds] = useState<string[]>([]);
   const [operationHistory, setOperationHistory] = useState<CanvasOperation[]>([]);
-  const [assistantInsights, setAssistantInsights] = useState<Array<{type: string, content: string}>>([]);
+  
+  // Refs
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  // Add a welcome message when the component mounts
+  useEffect(() => {
+    const welcomeMessage: Message = {
+      id: 'welcome',
+      type: 'assistant',
+      content: 'Hello! I\'m your Smart Shopper assistant. Describe what you\'re looking for, and I\'ll help you find the best products.',
+      timestamp: new Date()
+    };
+    
+    setMessages([welcomeMessage]);
+  }, []);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   // Handle canvas operations
   const processCanvasOperation = useCallback((operation: CanvasOperation) => {
@@ -172,11 +214,154 @@ const App: React.FC = () => {
     }
   }, [processCanvasOperation]);
 
+  // Add a PLAN message to the chat
+  const addPlanMessage = (planContent: string) => {
+    const planMessage: Message = {
+      id: `plan-${Date.now()}`,
+      type: 'plan',
+      content: planContent,
+      timestamp: new Date()
+    };
+    
+    setMessages(prev => [...prev, planMessage]);
+  };
+
+  // Add a tool usage message to the chat
+  const addToolMessage = (toolName: string, params: any) => {
+    const toolMessage: Message = {
+      id: `tool-${Date.now()}`,
+      type: 'tool',
+      content: (
+        <div>
+          <div className="font-medium">Using tool: {toolName}</div>
+          <pre className="text-xs mt-1 bg-gray-100 p-2 rounded overflow-auto">
+            {JSON.stringify(params, null, 2)}
+          </pre>
+        </div>
+      ),
+      timestamp: new Date()
+    };
+    
+    setMessages(prev => [...prev, toolMessage]);
+  };
+
+  // Add a product display message to the chat
+  const addProductDisplayMessage = (displayedProducts: Product[]) => {
+    if (displayedProducts.length === 0) return;
+    
+    const productMessage: ProductDisplayMessage = {
+      id: `products-${Date.now()}`,
+      type: 'product-display',
+      content: 'Product Results:',
+      products: displayedProducts,
+      highlightedProductId: highlightedProductId || undefined,
+      highlightReason: highlightReason || undefined,
+      gridLayout,
+      timestamp: new Date()
+    };
+    
+    setMessages(prev => [...prev, productMessage]);
+  };
+
+  // Add a REFLECT message to the chat
+  const addReflectMessage = (reflectContent: string) => {
+    const reflectMessage: Message = {
+      id: `reflect-${Date.now()}`,
+      type: 'reflect',
+      content: reflectContent,
+      timestamp: new Date()
+    };
+    
+    setMessages(prev => [...prev, reflectMessage]);
+  };
+
+  // Process search query
+  const handleSearch = async (query: string) => {
+    setIsLoading(true);
+    
+    // Add user message to chat
+    const userMessage: Message = {
+      id: `user-${Date.now()}`,
+      type: 'user',
+      content: query,
+      timestamp: new Date()
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    
+    // Add PLAN message
+    addPlanMessage(
+      `I'll help you find ${query}. I'll search for products, analyze the results, and recommend the best options.`
+    );
+    
+    try {
+      // Add tool usage message
+      addToolMessage('multi_source_search', {
+        query,
+        sources: ['serpapi', 'search1', 'perplexity'],
+        max_results: 12
+      });
+      
+      // Call the multi-source MCP tool
+      const response = await axios.post('/api/mcp/multi_source_search', {
+        query,
+        sources: ['serpapi', 'search1', 'perplexity'],
+        max_results: 12,
+        sort_by: 'relevance'
+      });
+      
+      // Process product results
+      if (response.data.results) {
+        setProducts(response.data.results);
+        setDisplayedProductIds(response.data.results.map((p: Product) => p.id));
+        
+        // Add product display to the chat
+        addProductDisplayMessage(response.data.results);
+      }
+      
+      // Process enrichment
+      if (response.data.enrichment) {
+        setEnrichment(response.data.enrichment);
+      }
+      
+      // Get Claude assistance
+      await getClaudeAssistance(query);
+      
+      // Add REFLECT message
+      addReflectMessage(
+        `I've found ${response.data.results?.length || 0} products matching "${query}". ` +
+        `I've highlighted the best option based on price, ratings, and features.`
+      );
+      
+    } catch (error) {
+      console.error('Error processing query:', error);
+      
+      // Add error message
+      const errorMessage: Message = {
+        id: `error-${Date.now()}`,
+        type: 'assistant',
+        content: 'Sorry, I encountered an error while searching for products. Please try again.',
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Get Claude AI assistance
-  const getClaudeAssistance = useCallback(async () => {
+  const getClaudeAssistance = useCallback(async (query: string) => {
     if (!query.trim() || products.length === 0) return;
     
     try {
+      // Add tool usage message
+      addToolMessage('claude_assist', {
+        query,
+        products: products.length,
+        enrichment: enrichment.length
+      });
+      
       const response = await axios.post('/api/mcp/claude_assist', {
         query,
         products,
@@ -189,9 +374,16 @@ const App: React.FC = () => {
       
       const assistResponse: ClaudeAssistResponse = response.data.response;
       
-      // Apply insights
+      // Add Claude's insights to the chat
       if (assistResponse.insights && assistResponse.insights.length > 0) {
-        setAssistantInsights(assistResponse.insights);
+        const insightsMessage: Message = {
+          id: `insights-${Date.now()}`,
+          type: 'assistant',
+          content: assistResponse.insights.map(insight => insight.content).join('\n\n'),
+          timestamp: new Date()
+        };
+        
+        setMessages(prev => [...prev, insightsMessage]);
       }
       
       // Apply canvas operations
@@ -199,135 +391,54 @@ const App: React.FC = () => {
         // Execute each operation in sequence
         for (const op of assistResponse.canvas_operations) {
           await executeCanvasOperation(op);
+          
+          // If it's a highlight operation, mention it in the chat
+          if (op.op === 'highlight_choice' && op.reason) {
+            const highlightMessage: Message = {
+              id: `highlight-${Date.now()}`,
+              type: 'assistant',
+              content: `I recommend this product: ${op.reason}`,
+              timestamp: new Date()
+            };
+            
+            setMessages(prev => [...prev, highlightMessage]);
+          }
         }
+        
+        // Update product display in chat
+        const filteredProducts = displayedProductIds.length > 0
+          ? products.filter(p => displayedProductIds.includes(p.id))
+          : products;
+          
+        addProductDisplayMessage(filteredProducts);
       }
     } catch (error) {
       console.error('Error getting Claude assistance:', error);
     }
-  }, [query, products, enrichment, displayedProductIds, gridLayout, executeCanvasOperation]);
+  }, [products, enrichment, displayedProductIds, gridLayout, executeCanvasOperation]);
 
-  // Filtered products based on displayed IDs
-  const filteredProducts = displayedProductIds.length > 0
-    ? products.filter(p => displayedProductIds.includes(p.id))
-    : products;
-
-  const handleSearch = async (e: React.FormEvent) => {
+  // Handle form submission
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!inputValue.trim() || isLoading) return;
     
-    if (!query.trim()) return;
-    
-    setLoading(true);
-    setError(null);
-    setProducts([]);
-    setEnrichment([]);
-    setHighlightedProductId(null);
-    setHighlightReason(null);
-    setAssistantInsights([]);
-    
-    try {
-      console.log('Searching for:', query);
-      // Call the multi-source MCP tool
-      const response = await axios.post('/api/mcp/multi_source_search', {
-        query,
-        sources: ['serpapi', 'search1', 'perplexity'],
-        max_results: 12,
-        sort_by: 'relevance'
-      });
-      
-      console.log('Search response:', response.data);
-      
-      if (response.data.results) {
-        setProducts(response.data.results);
-        // By default, display all products
-        setDisplayedProductIds(response.data.results.map((p: Product) => p.id));
-      }
-      
-      if (response.data.enrichment) {
-        setEnrichment(response.data.enrichment);
-      }
-      
-      // After search completes successfully, get Claude assistance
-      setTimeout(() => {
-        getClaudeAssistance();
-      }, 500); // Give a slight delay for state updates to complete
-      
-    } catch (err) {
-      console.error('Error fetching products:', err);
-      setError('Failed to fetch products. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+    handleSearch(inputValue);
+    setInputValue('');
   };
 
-  // Dynamic grid columns based on layout
-  const gridClass = `grid-cols-1 md:grid-cols-${Math.min(gridLayout.columns, 2)} lg:grid-cols-${gridLayout.columns}`;
+  // Render product grid for product display messages
+  const renderProductGrid = (message: ProductDisplayMessage) => {
+    const { products, highlightedProductId, highlightReason, gridLayout } = message;
+    
+    // Dynamic grid columns based on layout
+    const gridClass = `grid-cols-1 md:grid-cols-${Math.min(gridLayout.columns, 2)} lg:grid-cols-${gridLayout.columns}`;
 
-  return (
-    <div className="container mx-auto p-4">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold text-center text-blue-600">Smart Shopper</h1>
-        <p className="text-center text-gray-600">AI-powered shopping assistant</p>
-      </header>
-      
-      <form onSubmit={handleSearch} className="mb-6">
-        <div className="flex w-full max-w-2xl mx-auto">
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Describe what you're looking for..."
-            className="flex-grow p-3 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            type="submit"
-            className="bg-blue-600 text-white px-6 py-3 rounded-r-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            disabled={loading}
-          >
-            {loading ? 'Searching...' : 'Search'}
-          </button>
-        </div>
-      </form>
-      
-      {error && (
-        <div className="text-red-600 text-center mb-4">{error}</div>
-      )}
-      
-      {/* Assistant Insights */}
-      {assistantInsights.length > 0 && (
-        <div className="mb-6 p-4 border border-green-200 bg-green-50 rounded-lg">
-          <h2 className="text-lg font-semibold mb-2 text-green-800">AI Assistant Insights</h2>
-          {assistantInsights.map((insight, index) => (
-            <div key={`insight-${index}`} className="mb-2">
-              <p className="text-sm">{insight.content}</p>
-            </div>
-          ))}
-        </div>
-      )}
-      
-      {/* Product Enrichment Section */}
-      {enrichment && enrichment.length > 0 && (
-        <div className="mb-6 p-4 border border-blue-200 bg-blue-50 rounded-lg">
-          <h2 className="text-lg font-semibold mb-2">Product Insights</h2>
-          {enrichment.map((item, index) => (
-            <div key={`enrichment-${index}`} className="mb-3">
-              <h3 className="font-medium">{item.topic}</h3>
-              <p className="text-sm">{item.content}</p>
-              {item.sources && item.sources.length > 0 && (
-                <div className="text-xs text-gray-500 mt-1">
-                  Source: <a href={item.sources[0]} className="text-blue-500 hover:underline" target="_blank" rel="noopener noreferrer">{item.sources[0]}</a>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-      
-      {/* Product Grid */}
-      <div className={`product-grid grid ${gridClass} gap-6`}>
-        {filteredProducts.map(product => (
+    return (
+      <div className={`product-grid grid ${gridClass} gap-4 mt-2`}>
+        {products.map(product => (
           <div
             key={product.id}
-            className={`border rounded-lg p-4 hover:shadow-lg transition-shadow ${
+            className={`border rounded-lg p-3 hover:shadow-lg transition-shadow ${
               highlightedProductId === product.id 
                 ? 'border-blue-500 ring-2 ring-blue-300 bg-blue-50' 
                 : 'border-gray-200'
@@ -338,7 +449,7 @@ const App: React.FC = () => {
                 {highlightReason}
               </div>
             )}
-            <div className="h-40 bg-gray-100 flex items-center justify-center mb-4">
+            <div className="h-32 bg-gray-100 flex items-center justify-center mb-3">
               {product.img_url ? (
                 <img
                   src={product.img_url}
@@ -349,23 +460,23 @@ const App: React.FC = () => {
                 <div className="text-gray-400">No image available</div>
               )}
             </div>
-            <h3 className="font-medium text-lg mb-2">{product.title}</h3>
+            <h3 className="font-medium text-sm mb-1 line-clamp-2">{product.title}</h3>
             <div className="flex justify-between items-center">
-              <span className="text-blue-600 font-bold">{product.price}</span>
-              <span className="text-gray-500 text-sm">{product.source}</span>
+              <span className="text-blue-600 font-bold text-sm">{product.price}</span>
+              <span className="text-gray-500 text-xs">{product.source}</span>
             </div>
             {product.rating && (
-              <div className="mt-2 text-sm text-gray-600">
+              <div className="mt-1 text-xs text-gray-600">
                 Rating: {product.rating} ({product.reviews_count || 0} reviews)
               </div>
             )}
             {product.link && (
-              <div className="mt-3">
+              <div className="mt-2">
                 <a 
                   href={product.link} 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="text-sm text-blue-500 hover:underline"
+                  className="text-xs text-blue-500 hover:underline"
                 >
                   View product
                 </a>
@@ -374,26 +485,126 @@ const App: React.FC = () => {
           </div>
         ))}
       </div>
+    );
+  };
+
+  // Render individual message
+  const renderMessage = (message: Message) => {
+    switch (message.type) {
+      case 'user':
+        return (
+          <div className="flex justify-end mb-4">
+            <div className="bg-blue-500 text-white rounded-lg py-2 px-4 max-w-[80%]">
+              {message.content}
+            </div>
+          </div>
+        );
+        
+      case 'assistant':
+        return (
+          <div className="flex justify-start mb-4">
+            <div className="bg-gray-200 text-gray-800 rounded-lg py-2 px-4 max-w-[80%]">
+              {message.content}
+            </div>
+          </div>
+        );
+        
+      case 'plan':
+        return (
+          <div className="flex justify-start mb-4">
+            <div className="bg-indigo-100 text-indigo-800 rounded-lg py-2 px-4 max-w-[80%] border-l-4 border-indigo-500">
+              <div className="font-bold mb-1">PLAN</div>
+              {message.content}
+            </div>
+          </div>
+        );
+        
+      case 'tool':
+        return (
+          <div className="flex justify-start mb-4">
+            <div className="bg-gray-100 text-gray-800 rounded-lg py-2 px-4 max-w-[80%] border-l-4 border-amber-500 font-mono text-sm">
+              {message.content}
+            </div>
+          </div>
+        );
+        
+      case 'reflect':
+        return (
+          <div className="flex justify-start mb-4">
+            <div className="bg-green-100 text-green-800 rounded-lg py-2 px-4 max-w-[80%] border-l-4 border-green-500">
+              <div className="font-bold mb-1">REFLECT</div>
+              {message.content}
+            </div>
+          </div>
+        );
+        
+      case 'product-display':
+        const productMessage = message as ProductDisplayMessage;
+        return (
+          <div className="flex justify-start mb-4 w-full">
+            <div className="bg-white border border-gray-200 rounded-lg py-3 px-4 max-w-full w-full">
+              <div className="font-medium mb-2">Product Results</div>
+              {renderProductGrid(productMessage)}
+            </div>
+          </div>
+        );
+        
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-screen bg-gray-50">
+      <header className="bg-white shadow-sm py-4 px-6">
+        <h1 className="text-xl font-bold text-blue-600">Smart Shopper</h1>
+        <p className="text-sm text-gray-600">AI-powered shopping assistant</p>
+      </header>
       
-      {/* Empty State */}
-      {products.length === 0 && !loading && (
-        <div className="text-center text-gray-500 mt-12">
-          <p>Search for products to see results here</p>
-        </div>
-      )}
-      
-      {/* Loading indicator for Claude assistance */}
-      {loading && (
-        <div className="fixed bottom-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg">
-          <div className="flex items-center">
-            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <span>AI assistant is thinking...</span>
+      <div className="flex-grow overflow-hidden flex flex-col" ref={chatContainerRef}>
+        {/* Chat messages */}
+        <div className="flex-grow overflow-y-auto p-4">
+          <div className="max-w-4xl mx-auto">
+            {messages.map(message => (
+              <div key={message.id}>
+                {renderMessage(message)}
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
           </div>
         </div>
-      )}
+        
+        {/* Input area */}
+        <div className="bg-white border-t p-4">
+          <form onSubmit={handleSubmit} className="max-w-4xl mx-auto flex">
+            <input
+              type="text"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              placeholder="Describe what you're looking for..."
+              className="flex-grow p-2 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={isLoading}
+            />
+            <button
+              type="submit"
+              className="bg-blue-600 text-white px-4 py-2 rounded-r-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <span className="flex items-center">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Thinking...
+                </span>
+              ) : (
+                'Send'
+              )}
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
   );
 };
