@@ -3,13 +3,66 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="X-UA-Compatible" content="ie=edge">
-  <title>Smart Shopper - AI-Powered Shopping Assistant</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css">
-  <script src="%PUBLIC_URL%/env-config.js"></script>
+  <title>Smart Shopper - AI Shopping Assistant</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 </head>
-<body class="bg-gray-50">
-  <div id="root"></div>
-  <!-- Scripts are automatically injected by react-scripts build process -->
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header>
+      <div class="logo">
+        <h1>Smart Shopper</h1>
+        <span class="tagline">AI-Powered Shopping Assistant</span>
+      </div>
+    </header>
+
+    <!-- Main content area -->
+    <main>
+      <div class="chat-container">
+        <div class="chat-messages" id="chatMessages">
+          <!-- Welcome message -->
+          <div class="message system">
+            <div class="message-content">
+              <p>Welcome to Smart Shopper! How can I help you shop today?</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="chat-input">
+          <form id="chatForm">
+            <input 
+              type="text" 
+              id="userInput" 
+              placeholder="Describe what you're looking for..." 
+              autocomplete="off"
+            >
+            <button type="submit">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="product-canvas" id="productCanvas">
+        <!-- Product cards will be displayed here -->
+        <div class="canvas-placeholder" id="canvasPlaceholder">
+          <p>Ask me about products you're interested in!</p>
+          <p>For example: "Find me running shoes under $100" or "I need a birthday gift for my mom who loves gardening"</p>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+      <p>Smart Shopper - Powered by Claude and MCP</p>
+    </footer>
+  </div>
+
+  <!-- Scripts -->
+  <script src="app.js"></script>
 </body>
 </html>
