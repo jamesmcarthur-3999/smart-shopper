@@ -48,7 +48,6 @@ All operations follow the PLAN → tool_use → PATCH → REFLECT workflow:
 ### Prerequisites
 
 - Node.js (v16 or higher)
-- The repository already includes all necessary API keys
 
 ### Installation
 
@@ -63,36 +62,29 @@ All operations follow the PLAN → tool_use → PATCH → REFLECT workflow:
    npm install
    ```
 
-3. The app already includes real API keys in the `.env` file - no need to modify them:
+3. Create a `.env` file with your API keys (you can use the provided `.env.example` as a template):
    ```bash
-   # API keys already included:
-   # - SERPAPI_API_KEY=sk_c33fc85ca53ef6bca74b03d67ad14b19
-   # - SEARCH1_API_KEY=sk_s1_2b9ef10ca5bde9e83a7d41f4ad4d39b7
-   # - PERPLEXITY_API_KEY=pplx_5a78d1be73acc48abb4a1cf09d8b32a6c8
-   # - CLAUDE_API_KEY=sk_ant_api_key_test9875231c4ea1d3
+   cp .env.example .env
    ```
+   Then edit the `.env` file with your actual API keys.
 
-4. Start the server using the provided script (which validates API keys):
+4. Start the server:
    ```bash
-   # Make the script executable
-   chmod +x start.sh
-   
-   # Run the script
-   ./start.sh
+   npm start
    ```
 
 5. Open your browser to http://localhost:3001
 
 ### API Keys
 
-The app includes real working API keys for all required services:
+You'll need to obtain and configure API keys for the following services:
 
-- Claude API: API key already included in `.env`
-- SerpAPI: API key already included in `.env`
-- Perplexity: API key already included in `.env`
-- Search1API: API key already included in `.env`
+- **Claude API**: Get from [Anthropic Console](https://console.anthropic.com/)
+- **SerpAPI**: Sign up at [SerpAPI](https://serpapi.com/)
+- **Perplexity API**: Get from [Perplexity API](https://docs.perplexity.ai/)
+- **Search1API**: For development, the app will use JSONPlaceholder if this API is unavailable
 
-All API key patterns are validated at startup to ensure they match the expected format.
+For local development, the app includes fallback mock data mechanisms if APIs are unavailable.
 
 ## Development
 
@@ -117,16 +109,18 @@ This will start the server with nodemon for automatic reloading.
 ### Common Issues
 
 1. **Authentication Errors (401)**:
-   - Ensure you're using the provided API keys in the `.env` file
-   - Do not modify the API keys as they are already configured and working
+   - Check that you have valid API keys in your `.env` file
+   - Ensure the keys match the expected formats (see `.env.example`)
 
 2. **"I couldn't connect to Claude's API" message**:
-   - Run the provided start.sh script which validates the API keys
-   - Check that you haven't accidentally modified the .env file
+   - Verify your Claude API key is correctly formatted and active
 
-3. **Slow or missing product results**:
-   - The app uses real API keys that should work properly
+3. **Search1API connection errors**:
+   - The app now uses JSONPlaceholder as a fallback for development
+
+4. **Slow or missing product results**:
    - Check console logs for specific error messages
+   - In development mode, the app will provide mock data when APIs fail
 
 ## Contributing
 
