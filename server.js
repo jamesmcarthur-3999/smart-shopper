@@ -34,11 +34,34 @@ const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY;
 
 // Log partial API keys for debugging (only in development)
 if (isDev) {
-  console.log('API Keys configured:');
-  console.log(`- SERPAPI_KEY: ${SERPAPI_KEY ? (SERPAPI_KEY.substring(0, 3) + '...' + SERPAPI_KEY.substring(SERPAPI_KEY.length - 3)) : 'MISSING'}`);
-  console.log(`- SEARCH1_KEY: ${SEARCH1_KEY ? (SEARCH1_KEY.substring(0, 3) + '...' + SEARCH1_KEY.substring(SEARCH1_KEY.length - 3)) : 'MISSING'}`);
-  console.log(`- PERPLEXITY_KEY: ${PERPLEXITY_KEY ? (PERPLEXITY_KEY.substring(0, 3) + '...' + PERPLEXITY_KEY.substring(PERPLEXITY_KEY.length - 3)) : 'MISSING'}`);
-  console.log(`- CLAUDE_API_KEY: ${CLAUDE_API_KEY ? (CLAUDE_API_KEY.substring(0, 3) + '...' + CLAUDE_API_KEY.substring(CLAUDE_API_KEY.length - 3)) : 'MISSING'}`);
+  console.log('REAL API Keys configured from .env file:');
+  console.log(`- SERPAPI_KEY: ${SERPAPI_KEY ? (SERPAPI_KEY.substring(0, 5) + '...' + SERPAPI_KEY.substring(SERPAPI_KEY.length - 3)) : 'MISSING'}`);
+  console.log(`- SEARCH1_KEY: ${SEARCH1_KEY ? (SEARCH1_KEY.substring(0, 5) + '...' + SEARCH1_KEY.substring(SEARCH1_KEY.length - 3)) : 'MISSING'}`);
+  console.log(`- PERPLEXITY_KEY: ${PERPLEXITY_KEY ? (PERPLEXITY_KEY.substring(0, 5) + '...' + PERPLEXITY_KEY.substring(PERPLEXITY_KEY.length - 3)) : 'MISSING'}`);
+  console.log(`- CLAUDE_API_KEY: ${CLAUDE_API_KEY ? (CLAUDE_API_KEY.substring(0, 5) + '...' + CLAUDE_API_KEY.substring(CLAUDE_API_KEY.length - 3)) : 'MISSING'}`);
+  
+  // Validate that we're using real keys, not placeholders
+  const realKeyPatterns = {
+    SERPAPI_KEY: /^sk_c/,
+    SEARCH1_KEY: /^sk_s1_/,
+    PERPLEXITY_KEY: /^pplx_/,
+    CLAUDE_API_KEY: /^sk_ant/
+  };
+  
+  let usingRealKeys = true;
+  Object.entries(realKeyPatterns).forEach(([key, pattern]) => {
+    const value = eval(key);
+    if (!value || !pattern.test(value)) {
+      console.error(`⚠️ The ${key} doesn't match the expected pattern for a real key`);
+      usingRealKeys = false;
+    }
+  });
+  
+  if (usingRealKeys) {
+    console.log('✅ Using REAL API keys from .env file, not placeholders');
+  } else {
+    console.error('❌ Some API keys appear to be placeholders! Check your .env file');
+  }
 }
 
 // API Endpoints
