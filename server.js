@@ -4,9 +4,24 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const axios = require('axios');
 const ClaudeClient = require('./scripts/claude-client');
+const util = require('util');
 
 // Load environment variables
 dotenv.config();
+
+// Ensure API keys are properly loaded
+const requiredKeys = ['SERPAPI_API_KEY', 'SEARCH1_API_KEY', 'PERPLEXITY_API_KEY', 'CLAUDE_API_KEY'];
+const missingKeys = requiredKeys.filter(key => !process.env[key]);
+
+if (missingKeys.length > 0) {
+  console.warn(`⚠️ Missing API keys: ${missingKeys.join(', ')}`);
+}
+
+// Enable more detailed logging in development mode
+const isDev = process.env.NODE_ENV !== 'production';
+if (isDev) {
+  console.log('Running in development mode with enhanced logging');
+}
 
 const app = express();
 const PORT = process.env.SERVER_PORT || 3001;
@@ -17,16 +32,32 @@ const SEARCH1_KEY = process.env.SEARCH1_API_KEY;
 const PERPLEXITY_KEY = process.env.PERPLEXITY_API_KEY;
 const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY;
 
+// Log partial API keys for debugging (only in development)
+if (isDev) {
+  console.log('API Keys configured:');
+  console.log(`- SERPAPI_KEY: ${SERPAPI_KEY ? (SERPAPI_KEY.substring(0, 3) + '...' + SERPAPI_KEY.substring(SERPAPI_KEY.length - 3)) : 'MISSING'}`);
+  console.log(`- SEARCH1_KEY: ${SEARCH1_KEY ? (SEARCH1_KEY.substring(0, 3) + '...' + SEARCH1_KEY.substring(SEARCH1_KEY.length - 3)) : 'MISSING'}`);
+  console.log(`- PERPLEXITY_KEY: ${PERPLEXITY_KEY ? (PERPLEXITY_KEY.substring(0, 3) + '...' + PERPLEXITY_KEY.substring(PERPLEXITY_KEY.length - 3)) : 'MISSING'}`);
+  console.log(`- CLAUDE_API_KEY: ${CLAUDE_API_KEY ? (CLAUDE_API_KEY.substring(0, 3) + '...' + CLAUDE_API_KEY.substring(CLAUDE_API_KEY.length - 3)) : 'MISSING'}`);
+}
+
 // API Endpoints
 const SERPAPI_ENDPOINT = process.env.SERPAPI_ENDPOINT || 'https://serpapi.com/search';
 const SEARCH1_ENDPOINT = process.env.SEARCH1_ENDPOINT || 'https://api.search1.com/search';
 const PERPLEXITY_ENDPOINT = process.env.PERPLEXITY_ENDPOINT || 'https://api.perplexity.ai/search';
 
-// Initialize Claude client
-const claudeClient = new ClaudeClient({
-  apiKey: CLAUDE_API_KEY,
-  maxTokens: 1024
-});
+// Initialize Claude client with detailed error handling
+try {
+  var claudeClient = new ClaudeClient({
+    apiKey: CLAUDE_API_KEY,
+    maxTokens: 1024,
+    model: 'claude-3-sonnet-20240229' // Explicitly set model version
+  });
+  console.log('Claude client initialized successfully');
+} catch (error) {
+  console.error('Failed to initialize Claude client:', error);
+  claudeClient = null;
+}
 
 // Middleware
 app.use(cors());
@@ -479,73 +510,84 @@ app.post('/api/mcp/claude_assist', async (req, res) => {
     
     // Log request
     console.log(`Claude assistance request for query: ${query}`);
-    console.log(`Using Claude API key: ${CLAUDE_API_KEY ? CLAUDE_API_KEY.substring(0, 5) + '...' : 'Not set'}`);
     
-    // Check if Claude API key is available
-    if (!CLAUDE_API_KEY) {
-      console.warn('Claude API key not set, using simulated response');
+    // Check if Claude client is properly initialized
+    if (!claudeClient || !CLAUDE_API_KEY) {
+      console.warn('Claude client not available, using fallback response');
       
-      // Simulate Claude's assistance response
-      const simulatedResponse = {
-        query,
-        insights: [
-          {
-            type: 'summary',
-            content: `Based on your search for "${query}", I found ${products.length} products that might be relevant.`
-          },
-          {
-            type: 'analysis',
-            content: `The average price for these products is ${calculateAveragePrice(products)}. Products from ${getMostCommonSource(products)} tend to have the highest ratings.`
-          }
-        ],
-        canvas_operations: []
-      };
-      
-      // Add simulated canvas operations for demonstration
-      if (products && products.length > 0) {
-        // Find the highest rated product
-        const highestRated = [...products].sort((a, b) => (b.rating || 0) - (a.rating || 0))[0];
-        
-        if (highestRated) {
-          // Highlight the highest rated product
-          simulatedResponse.canvas_operations.push({
-            op: 'highlight_choice',
-            id: highestRated.id,
-            reason: 'Highest customer rating'
-          });
+      // Return a helpful error response with HTTP 401 Unauthorized
+      return res.status(401).json({
+        error: 'MCP_031: Claude API authentication failed',
+        details: 'API key missing or invalid. Please check your CLAUDE_API_KEY environment variable.',
+        fallback: {
+          query,
+          insights: [
+            {
+              type: 'error',
+              content: `I couldn't connect to Claude's API to analyze these products. Here's a simple overview instead.`
+            },
+            {
+              type: 'summary',
+              content: `Based on your search for \"${query}\", I found ${products?.length || 0} products with an average price of ${calculateAveragePrice(products)}.`
+            }
+          ],
+          canvas_operations: [
+            {
+              op: 'update_grid',
+              items: products?.map(p => p.id) || [],
+              layout: {
+                columns: 3,
+                gap: '1rem'
+              }
+            }
+          ]
         }
-        
-        // Update grid layout for better display
-        simulatedResponse.canvas_operations.push({
-          op: 'update_grid',
-          items: products.map(p => p.id).slice(0, 6), // Show top 6 products
-          layout: {
-            columns: 3,
-            gap: '1rem'
-          }
-        });
-      }
-      
-      // Send simulated response
-      return res.json({
-        status: 'success',
-        response: simulatedResponse
       });
     }
     
-    // Use Claude client to get shopping assistance
-    const assistResponse = await claudeClient.getShoppingAssistance({
-      query,
-      products,
-      enrichment,
-      context
-    });
+    // Log detailed request in development mode
+    if (isDev) {
+      console.log('Claude request details:');
+      console.log(`- Query: \"${query}\"`);
+      console.log(`- Products: ${products?.length || 0} items`);
+      console.log(`- Enrichment: ${enrichment?.length || 0} items`);
+    }
     
-    // Send Claude's response
-    res.json({
-      status: 'success',
-      response: assistResponse
-    });
+    // Use Claude client to get shopping assistance
+    try {
+      const assistResponse = await claudeClient.getShoppingAssistance({
+        query,
+        products,
+        enrichment,
+        context
+      });
+      
+      console.log('Claude API request successful');
+      
+      // Send Claude's response
+      return res.json({
+        status: 'success',
+        response: assistResponse
+      });
+    } catch (claudeError) {
+      console.error('Error calling Claude API:', claudeError);
+      
+      // Determine appropriate status code
+      let statusCode = 500;
+      if (claudeError.response) {
+        statusCode = claudeError.response.status;
+        if (isDev) {
+          console.error('Claude API error response:', claudeError.response.data);
+        }
+      }
+      
+      // Return error with appropriate status
+      return res.status(statusCode).json({
+        error: 'MCP_032: Claude API request failed',
+        details: claudeError.message,
+        statusCode
+      });
+    }
   } catch (error) {
     console.error('Error in Claude AI Assistant MCP tool:', error);
     res.status(500).json({ 
@@ -606,5 +648,5 @@ app.get('*', (req, res) => {
 app.listen(PORT, () => {
   console.log(`Smart Shopper MCP server running on port ${PORT}`);
   console.log(`API Keys configured: ${Boolean(SERPAPI_KEY)} | ${Boolean(SEARCH1_KEY)} | ${Boolean(PERPLEXITY_KEY)} | ${Boolean(CLAUDE_API_KEY)}`);
-  console.log(`Environment: ${process.env.NODE_ENV}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
