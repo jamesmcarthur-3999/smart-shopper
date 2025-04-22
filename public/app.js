@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
       await processShoppingRequest(query);
     } catch (error) {
       console.error('Error processing shopping request:', error);
-      addChatMessage('Sorry, I encountered an error while processing your request. Please try again.', 'assistant');
+      addChatMessage(`I encountered an error while processing your request: ${error.message}. Please try again.`, 'assistant');
     } finally {
       // Remove thinking indicator
       hideThinking(thinkingId);
@@ -59,10 +59,10 @@ document.addEventListener('DOMContentLoaded', () => {
    */
   async function processShoppingRequest(query) {
     try {
-      // Start with the PLAN phase
-      addChatMessage(`I'll help you find ${query}. Let me search for some options...`, 'assistant');
+      console.log(`Processing shopping request for "${query}"`);
       
-      // Use multi-source search to get product results (tool_use phase)
+      // Start with the MCP multi-source search (tool_use phase)
+      // Don't show a hardcoded message before actual results
       const searchResponse = await axios.post('/api/mcp/multi_source_search', {
         query,
         sources: ['serpapi', 'search1', 'perplexity'],
@@ -71,8 +71,14 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       
       if (!searchResponse.data || searchResponse.data.status !== 'success') {
+        console.error('Multi-source search failed:', searchResponse.data);
         throw new Error('Failed to retrieve search results');
       }
+      
+      console.log('Multi-source search successful:', {
+        resultCount: searchResponse.data.results?.length || 0,
+        enrichmentCount: searchResponse.data.enrichment?.length || 0
+      });
       
       // Store products
       state.products = searchResponse.data.results || [];
@@ -91,11 +97,13 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       
       if (!assistResponse.data || assistResponse.data.status !== 'success') {
-        throw new Error('Failed to get Claude assistance');
+        console.error('Claude assistance failed:', assistResponse.data);
+        throw new Error('Failed to get shopping assistance');
       }
       
       // Process Claude's response
       const claudeResponse = assistResponse.data.response;
+      console.log('Claude assistance successful:', claudeResponse);
       
       // Send Claude's insights to the chat
       if (claudeResponse.insights && claudeResponse.insights.length > 0) {
@@ -105,19 +113,49 @@ document.addEventListener('DOMContentLoaded', () => {
         
         addChatMessage(insightsMessage, 'assistant');
       } else {
-        addChatMessage(`Here are some options for "${query}". Take a look at the results I found.`, 'assistant');
+        // Only show this generic message if Claude didn't provide specific insights
+        addChatMessage(`Here are some options for "${query}" that might interest you.`, 'assistant');
       }
       
       // Process canvas operations (PATCH phase)
       if (claudeResponse.canvas_operations && claudeResponse.canvas_operations.length > 0) {
+        console.log('Processing canvas operations:', claudeResponse.canvas_operations);
         processCanvasOperations(claudeResponse.canvas_operations);
       } else {
         // Default rendering if no specific operations provided
+        console.log('No canvas operations provided, using default rendering');
         renderProductGrid(state.products);
       }
       
     } catch (error) {
       console.error('Error in shopping request:', error);
+      
+      // Show error message to user
+      if (error.response) {
+        // The request was made and the server responded with an error status
+        const statusCode = error.response.status;
+        const errorDetail = error.response.data?.error || 'Unknown error';
+        
+        let errorMessage = '';
+        if (statusCode === 401) {
+          errorMessage = 'There was an authentication error. Please check your API keys.';
+        } else if (statusCode === 404) {
+          errorMessage = 'The requested resource was not found.';
+        } else if (statusCode >= 500) {
+          errorMessage = 'There was a server error. Please try again later.';
+        } else {
+          errorMessage = `Error ${statusCode}: ${errorDetail}`;
+        }
+        
+        addChatMessage(errorMessage, 'assistant');
+      } else if (error.request) {
+        // The request was made but no response was received
+        addChatMessage('Unable to connect to the server. Please check your internet connection and try again.', 'assistant');
+      } else {
+        // Something happened in setting up the request
+        addChatMessage(`An unexpected error occurred: ${error.message}`, 'assistant');
+      }
+      
       throw error;
     }
   }
@@ -130,6 +168,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function processCanvasOperations(operations) {
     // Process each operation in sequence
     operations.forEach(operation => {
+      console.log('Processing canvas operation:', operation);
+      
       switch (operation.op) {
         case 'add_card':
           addProductCard(operation);
